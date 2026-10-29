@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BIM Viewer - IFC Reader</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <aside class="sidebar">
+        <h1>BIM Viewer (WebGPU)</h1>
+        <p class="subtitle">Wczytaj plik IFC i obejrzyj model 3D.</p>
+
+        <section class="card">
+          <label for="ifcFile" class="file-label">Plik IFC</label>
+          <input id="ifcFile" type="file" accept=".ifc,.ifcZIP,.ifczip" />
+          <div class="button-row">
+            <button id="loadButton" type="button">Wczytaj IFC</button>
+            <button id="loadSampleButton" type="button" class="secondary">Sample prosty</button>
+            <button id="loadRealisticSampleButton" type="button" class="secondary">Sample biurowiec + bledy</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Informacje</h2>
+          <pre id="output">Brak danych. Wybierz plik IFC i kliknij "Wczytaj IFC".</pre>
+        </section>
+
+        <section class="card">
+          <h2>Warstwy branzowe</h2>
+          <div id="layerControls" class="layer-controls"></div>
+        </section>
+
+        <section class="card">
+          <h2>Kolizje miedzy warstwami</h2>
+          <div class="collision-controls">
+            <select id="collisionLayerA"></select>
+            <select id="collisionLayerB"></select>
+            <button id="detectCollisionsButton" type="button">Wykryj kolizje</button>
+            <label class="isolation-toggle">
+              <input id="collisionIsolationToggle" type="checkbox" />
+              <span>Tryb izolacji kolizji</span>
+            </label>
+            <p class="isolation-hint">Niekolidujace = polprzezroczyste, kolidujace = pelne i czerwone.</p>
+          </div>
+          <div id="collisionOutput" class="collision-output">Brak analizy kolizji.</div>
+        </section>
+      </aside>
+
+      <section class="viewport">
+        <canvas id="viewerCanvas" aria-label="Podglad modelu IFC"></canvas>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
