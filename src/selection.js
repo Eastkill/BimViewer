@@ -49,14 +49,34 @@ export const createSelectionManager = ({ showModelInfo }) => {
     }
   };
 
+  const formatMeshInfo = (label, mesh, pairMeta = {}) => {
+    const expressId = pairMeta.expressId ?? mesh?.userData.expressID ?? "brak";
+    const geometryId = mesh?.userData.geometryExpressID ?? "brak";
+    const typeId = mesh?.userData.typeId ?? "brak";
+    const typeName = mesh?.userData.typeName ?? "brak";
+    const discipline = pairMeta.discipline ?? mesh?.userData.discipline ?? "brak";
+    const objectType = mesh?.userData.objectType ?? "brak";
+    const name = mesh?.userData.name ?? "brak";
+    const sourceFile = mesh?.userData.sourceFile ?? "brak";
+    return [
+      `${label}:`,
+      `Plik: ${sourceFile}`,
+      `ExpressID: ${expressId}`,
+      `GeometryID: ${geometryId}`,
+      `web-ifc typeId: ${typeId}`,
+      `Entity: ${typeName}`,
+      `Name: ${name}`,
+      `ObjectType: ${objectType}`,
+      `Branza: ${discipline}`,
+      `Warstwa: ${mesh?.userData.layerName ?? "brak"}`
+    ].join("\n");
+  };
+
   const selectMesh = (mesh) => {
-    const expressId = mesh.userData.expressID ?? "brak";
-    const geometryId = mesh.userData.geometryExpressID ?? "brak";
-    const discipline = mesh.userData.discipline ?? "brak";
     selectMeshes([mesh], {
       colorHex: 0x22d3ee,
       intensity: 0.6,
-      infoText: `Zaznaczenie:\nExpressID: ${expressId}\nGeometryID: ${geometryId}\nWarstwa: ${discipline}`
+      infoText: formatMeshInfo("Zaznaczenie", mesh)
     });
   };
 
@@ -66,10 +86,16 @@ export const createSelectionManager = ({ showModelInfo }) => {
       intensity: 0.95,
       infoText: [
         "Kolizja (czerwone podswietlenie):",
-        `A ExpressID: ${pairMeta.leftExpressId ?? leftMesh?.userData.expressID ?? "brak"}`,
-        `A warstwa: ${leftMesh?.userData.discipline ?? "brak"}`,
-        `B ExpressID: ${pairMeta.rightExpressId ?? rightMesh?.userData.expressID ?? "brak"}`,
-        `B warstwa: ${rightMesh?.userData.discipline ?? "brak"}`
+        "",
+        formatMeshInfo("A", leftMesh, {
+          expressId: pairMeta.leftExpressId,
+          discipline: pairMeta.leftDiscipline
+        }),
+        "",
+        formatMeshInfo("B", rightMesh, {
+          expressId: pairMeta.rightExpressId,
+          discipline: pairMeta.rightDiscipline
+        })
       ].join("\n")
     });
   };

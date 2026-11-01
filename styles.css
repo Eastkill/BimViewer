@@ -43,6 +43,32 @@ h1 {
   gap: 8px;
 }
 
+.layer-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.layer-create-form {
+  display: grid;
+  gap: 8px;
+}
+
+.layer-input {
+  width: 100%;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.layer-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .layer-row {
   display: grid;
   gap: 6px;
@@ -52,18 +78,53 @@ h1 {
   background: #0b1220;
 }
 
+.layer-row-custom {
+  border-color: #0ea5e9;
+}
+
 .layer-row-main {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.layer-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .layer-row input[type="checkbox"] {
   margin: 0;
 }
 
+.layer-badge {
+  font-size: 11px;
+  color: #082f49;
+  background: #38bdf8;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.layer-row-custom .layer-badge {
+  background: #f59e0b;
+  color: #1f2937;
+}
+
 .layer-count {
   margin-left: auto;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.layer-remove {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.layer-meta {
   color: #94a3b8;
   font-size: 12px;
 }
@@ -183,7 +244,14 @@ select {
 }
 
 input[type="file"] {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.file-hint {
+  margin: 0 0 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .button-row {

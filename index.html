@@ -13,12 +13,14 @@
         <p class="subtitle">Wczytaj plik IFC i obejrzyj model 3D.</p>
 
         <section class="card">
-          <label for="ifcFile" class="file-label">Plik IFC</label>
-          <input id="ifcFile" type="file" accept=".ifc,.ifcZIP,.ifczip" />
+          <label for="ifcFile" class="file-label">Pliki IFC (mozna wiele)</label>
+          <input id="ifcFile" type="file" accept=".ifc,.ifcZIP,.ifczip" multiple />
+          <p class="file-hint">Ctrl/Cmd + klik, aby dodac kilka plikow branżowych (np. architektura + wodkan + HVAC).</p>
           <div class="button-row">
             <button id="loadButton" type="button">Wczytaj IFC</button>
             <button id="loadSampleButton" type="button" class="secondary">Sample prosty</button>
             <button id="loadRealisticSampleButton" type="button" class="secondary">Sample biurowiec + bledy</button>
+            <button id="loadBothSamplesButton" type="button" class="secondary">Oba sample naraz</button>
           </div>
         </section>
 
@@ -28,7 +30,8 @@
         </section>
 
         <section class="card">
-          <h2>Warstwy branzowe</h2>
+          <h2>Warstwy</h2>
+          <p class="file-hint">Domyslne = branze. Mozesz dodac custom warstwy powiazane z plikiem albo entity.</p>
           <div id="layerControls" class="layer-controls"></div>
         </section>
 

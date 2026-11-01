@@ -5,6 +5,7 @@ export const createUI = () => {
   const loadButton = document.getElementById("loadButton");
   const loadSampleButton = document.getElementById("loadSampleButton");
   const loadRealisticSampleButton = document.getElementById("loadRealisticSampleButton");
+  const loadBothSamplesButton = document.getElementById("loadBothSamplesButton");
   const output = document.getElementById("output");
   const canvas = document.getElementById("viewerCanvas");
   const layerControls = document.getElementById("layerControls");
@@ -32,6 +33,7 @@ export const createUI = () => {
     loadButton.disabled = isLoading;
     loadSampleButton.disabled = isLoading;
     loadRealisticSampleButton.disabled = isLoading;
+    if (loadBothSamplesButton) loadBothSamplesButton.disabled = isLoading;
     detectCollisionsButton.disabled = isLoading;
     collisionIsolationToggle.disabled = isLoading;
     if (isLoading) {
@@ -101,31 +103,130 @@ export const createUI = () => {
     collisionOutput.append(list);
   };
 
-  const renderLayerControls = (disciplineCounts, handlers = {}) => {
+  const renderLayerControls = (layers, countsById, bindingOptions, handlers = {}) => {
     const onLayerToggle = handlers.onLayerToggle ?? (() => {});
     const onLayerOpacityChange = handlers.onLayerOpacityChange ?? (() => {});
+    const onAddCustomLayer = handlers.onAddCustomLayer ?? (() => {});
+    const onRemoveLayer = handlers.onRemoveLayer ?? (() => {});
+    const onResetDefaults = handlers.onResetDefaults ?? (() => {});
 
     layerControls.innerHTML = "";
-    for (const [discipline, count] of Object.entries(disciplineCounts)) {
-      const row = document.createElement("div");
-      row.className = "layer-row";
 
-      const top = document.createElement("label");
+    const toolbar = document.createElement("div");
+    toolbar.className = "layer-toolbar";
+
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.className = "secondary";
+    resetBtn.textContent = "Przywroc domyslne";
+    resetBtn.addEventListener("click", () => onResetDefaults());
+    toolbar.append(resetBtn);
+    layerControls.append(toolbar);
+
+    const form = document.createElement("div");
+    form.className = "layer-create-form";
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = "Nazwa custom warstwy";
+    nameInput.className = "layer-input";
+
+    const bindType = document.createElement("select");
+    bindType.className = "layer-input";
+    bindType.innerHTML = `
+      <option value="file">Powiaz z plikiem</option>
+      <option value="entity">Powiaz z entity</option>
+    `;
+
+    const bindValue = document.createElement("select");
+    bindValue.className = "layer-input";
+
+    const fillBindValues = () => {
+      const values = bindType.value === "file" ? bindingOptions.files : bindingOptions.entities;
+      bindValue.innerHTML = "";
+      if (!values.length) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Brak opcji - wczytaj model";
+        bindValue.append(empty);
+        return;
+      }
+      for (const value of values) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        bindValue.append(option);
+      }
+    };
+    bindType.addEventListener("change", fillBindValues);
+    fillBindValues();
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.textContent = "Dodaj warstwe";
+    addBtn.addEventListener("click", () => {
+      onAddCustomLayer({
+        name: nameInput.value,
+        bindType: bindType.value,
+        bindValue: bindValue.value
+      });
+      nameInput.value = "";
+    });
+
+    form.append(nameInput, bindType, bindValue, addBtn);
+    layerControls.append(form);
+
+    const hint = document.createElement("p");
+    hint.className = "layer-hint";
+    hint.textContent =
+      "Domyslne warstwy = branze. Custom warstwa przejmuje elementy z wybranego pliku albo typu entity.";
+    layerControls.append(hint);
+
+    for (const layer of layers) {
+      const row = document.createElement("div");
+      row.className = `layer-row ${layer.kind === "custom" ? "layer-row-custom" : ""}`;
+
+      const top = document.createElement("div");
       top.className = "layer-row-main";
 
+      const checkboxLabel = document.createElement("label");
+      checkboxLabel.className = "layer-check";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
-      checkbox.checked = true;
-      checkbox.addEventListener("change", () => onLayerToggle(discipline, checkbox.checked));
-
+      checkbox.checked = layer.visible;
+      checkbox.addEventListener("change", () => onLayerToggle(layer.id, checkbox.checked));
       const name = document.createElement("span");
-      name.textContent = discipline;
+      name.textContent = layer.name;
+      checkboxLabel.append(checkbox, name);
+
+      const badge = document.createElement("span");
+      badge.className = "layer-badge";
+      badge.textContent = layer.kind === "default" ? "domyslna" : "custom";
 
       const countNode = document.createElement("span");
       countNode.className = "layer-count";
-      countNode.textContent = `${count}`;
+      countNode.textContent = `${countsById[layer.id] ?? 0}`;
 
-      top.append(checkbox, name, countNode);
+      top.append(checkboxLabel, badge, countNode);
+
+      if (layer.kind === "custom") {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "secondary layer-remove";
+        removeBtn.textContent = "Usun";
+        removeBtn.addEventListener("click", () => onRemoveLayer(layer.id));
+        top.append(removeBtn);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "layer-meta";
+      if (layer.binding?.type === "discipline") {
+        meta.textContent = `Branza: ${layer.binding.value}`;
+      } else if (layer.binding?.type === "file") {
+        meta.textContent = `Plik: ${layer.binding.value}`;
+      } else if (layer.binding?.type === "entity") {
+        meta.textContent = `Entity: ${layer.binding.value}`;
+      }
 
       const opacityRow = document.createElement("div");
       opacityRow.className = "layer-opacity-row";
@@ -136,24 +237,23 @@ export const createUI = () => {
 
       const opacityValue = document.createElement("span");
       opacityValue.className = "layer-opacity-value";
-      opacityValue.textContent = "0%";
+      const transparencyPercent = Math.round((1 - layer.opacity) * 100);
+      opacityValue.textContent = `${transparencyPercent}%`;
 
       const opacitySlider = document.createElement("input");
       opacitySlider.type = "range";
       opacitySlider.min = "0";
       opacitySlider.max = "100";
       opacitySlider.step = "1";
-      // Slider = transparency percent (0 opaque, 100 fully transparent).
-      opacitySlider.value = "0";
+      opacitySlider.value = String(transparencyPercent);
       opacitySlider.addEventListener("input", () => {
-        const transparencyPercent = Number(opacitySlider.value);
-        opacityValue.textContent = `${transparencyPercent}%`;
-        const opacityPercent = 100 - transparencyPercent;
-        onLayerOpacityChange(discipline, opacityPercent);
+        const value = Number(opacitySlider.value);
+        opacityValue.textContent = `${value}%`;
+        onLayerOpacityChange(layer.id, 100 - value);
       });
 
       opacityRow.append(opacityLabel, opacitySlider, opacityValue);
-      row.append(top, opacityRow);
+      row.append(top, meta, opacityRow);
       layerControls.append(row);
     }
   };
@@ -187,6 +287,7 @@ export const createUI = () => {
     loadButton,
     loadSampleButton,
     loadRealisticSampleButton,
+    loadBothSamplesButton,
     canvas,
     writeOutput,
     showModelInfo,

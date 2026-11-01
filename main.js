@@ -1,5 +1,6 @@
 import { detectLayerCollisions } from "./src/collisions.js";
 import { createIfcService } from "./src/ifc-service.js";
+import { createLayerManager } from "./src/layer-manager.js";
 import { createSelectionManager } from "./src/selection.js";
 import { createUI } from "./src/ui.js";
 import { createViewer } from "./src/viewer.js";
@@ -8,20 +9,23 @@ import * as THREE from "three";
 const ui = createUI();
 const viewer = createViewer(ui.canvas);
 const ifcService = createIfcService();
+const layerManager = createLayerManager();
 const selection = createSelectionManager({ showModelInfo: ui.showModelInfo });
 
-const layerOpacityByDiscipline = new Map();
 const CLICK_MOVE_THRESHOLD_PX = 5;
 const ISOLATION_DIM_OPACITY = 0.14;
 
 let pointerDownPos = null;
 let lastCollisionResult = null;
 let activeCollisionPair = null;
+let lastDisciplineCounts = {};
 
 const boot = async () => {
   try {
     await viewer.start();
-    ui.writeOutput('Viewer gotowy. Wybierz plik IFC (np. samples/test-building.ifc) i kliknij "Wczytaj IFC".');
+    ui.writeOutput(
+      'Viewer gotowy. Wczytaj IFC, a potem dodawaj custom warstwy (plik / entity). Domyslne warstwy = branze.'
+    );
   } catch (error) {
     ui.writeOutput(
       `Blad inicjalizacji WebGPU: ${error?.message ?? String(error)}\n` +
@@ -31,15 +35,6 @@ const boot = async () => {
 };
 
 boot();
-
-const collectCollidingMeshes = (result) => {
-  const meshes = new Set();
-  for (const pair of result?.samplePairs ?? []) {
-    if (pair.leftMesh) meshes.add(pair.leftMesh);
-    if (pair.rightMesh) meshes.add(pair.rightMesh);
-  }
-  return meshes;
-};
 
 const setMeshVisualOpacity = (mesh, opacity) => {
   const material = mesh.material;
@@ -51,19 +46,77 @@ const setMeshVisualOpacity = (mesh, opacity) => {
   material.needsUpdate = true;
 };
 
-const applyMeshOpacity = (mesh) => {
-  const baseOpacity = mesh.userData.baseOpacity ?? 1;
-  const discipline = mesh.userData.discipline;
-  const layerOpacity = layerOpacityByDiscipline.get(discipline) ?? 1;
-  setMeshVisualOpacity(mesh, baseOpacity * layerOpacity);
+const collectCollidingMeshes = (result) => {
+  const meshes = new Set();
+  for (const pair of result?.samplePairs ?? []) {
+    if (pair.leftMesh) meshes.add(pair.leftMesh);
+    if (pair.rightMesh) meshes.add(pair.rightMesh);
+  }
+  return meshes;
+};
+
+const refreshLayersUi = () => {
+  const modelGroup = viewer.getModelGroup();
+  const countsById = layerManager.assignMeshes(modelGroup);
+  layerManager.applyVisibilityAndOpacity(modelGroup, { setMeshOpacity: setMeshVisualOpacity });
+
+  ui.renderLayerControls(
+    layerManager.getLayers(),
+    countsById,
+    layerManager.collectBindingOptions(modelGroup),
+    {
+      onLayerToggle: (layerId, visible) => {
+        layerManager.setLayerVisibility(layerId, visible);
+        layerManager.applyVisibilityAndOpacity(viewer.getModelGroup(), {
+          setMeshOpacity: setMeshVisualOpacity
+        });
+      },
+      onLayerOpacityChange: (layerId, opacityPercent) => {
+        layerManager.setLayerOpacity(layerId, opacityPercent / 100);
+        if (ui.isCollisionIsolationEnabled() && lastCollisionResult?.samplePairs?.length) {
+          applyCollisionIsolationView();
+          return;
+        }
+        layerManager.applyVisibilityAndOpacity(viewer.getModelGroup(), {
+          setMeshOpacity: setMeshVisualOpacity
+        });
+      },
+      onAddCustomLayer: ({ name, bindType, bindValue }) => {
+        try {
+          if (!bindValue) {
+            ui.writeOutput("Wybierz plik albo entity do powiazania custom warstwy.");
+            return;
+          }
+          layerManager.addCustomLayer({ name, bindType, bindValue });
+          refreshLayersUi();
+          ui.setCollisionLayerOptions(layerManager.getLayerNames());
+        } catch (error) {
+          ui.writeOutput(`Blad warstwy: ${error?.message ?? String(error)}`);
+        }
+      },
+      onRemoveLayer: (layerId) => {
+        try {
+          layerManager.removeLayer(layerId);
+          refreshLayersUi();
+          ui.setCollisionLayerOptions(layerManager.getLayerNames());
+        } catch (error) {
+          ui.writeOutput(`Blad warstwy: ${error?.message ?? String(error)}`);
+        }
+      },
+      onResetDefaults: () => {
+        layerManager.resetToDefaults(lastDisciplineCounts);
+        refreshLayersUi();
+        ui.setCollisionLayerOptions(layerManager.getLayerNames());
+        ui.writeOutput("Przywrocono warstwy domyslne (branze).");
+      }
+    }
+  );
 };
 
 const restoreAllLayerOpacities = () => {
-  const modelGroup = viewer.getModelGroup();
-  for (const mesh of modelGroup.children) {
-    if (!mesh.isMesh) continue;
-    applyMeshOpacity(mesh);
-  }
+  layerManager.applyVisibilityAndOpacity(viewer.getModelGroup(), {
+    setMeshOpacity: setMeshVisualOpacity
+  });
 };
 
 const applyCollisionIsolationView = () => {
@@ -86,6 +139,7 @@ const applyCollisionIsolationView = () => {
     if (!mesh.isMesh) continue;
     if (focusMeshes.has(mesh)) {
       setMeshVisualOpacity(mesh, mesh.userData.baseOpacity ?? 1);
+      mesh.visible = true;
     } else {
       setMeshVisualOpacity(mesh, ISOLATION_DIM_OPACITY);
     }
@@ -99,9 +153,9 @@ const applyCollisionIsolationView = () => {
       ? [
           "Tryb izolacji kolizji (aktywna para):",
           `A ExpressID: ${activeCollisionPair.leftExpressId}`,
-          `A warstwa: ${activeCollisionPair.leftDiscipline}`,
+          `A warstwa: ${activeCollisionPair.leftMesh?.userData.layerName ?? activeCollisionPair.leftDiscipline}`,
           `B ExpressID: ${activeCollisionPair.rightExpressId}`,
-          `B warstwa: ${activeCollisionPair.rightDiscipline}`
+          `B warstwa: ${activeCollisionPair.rightMesh?.userData.layerName ?? activeCollisionPair.rightDiscipline}`
         ].join("\n")
       : [
           "Tryb izolacji kolizji:",
@@ -114,37 +168,12 @@ const applyCollisionIsolationView = () => {
 const resetModelGroup = () => {
   ifcService.closeCurrentModel();
   selection.clearSelection();
-  layerOpacityByDiscipline.clear();
+  layerManager.reset();
+  lastDisciplineCounts = {};
   lastCollisionResult = null;
   activeCollisionPair = null;
   ui.setCollisionIsolationEnabled(false);
   viewer.replaceModelGroup(new THREE.Group());
-};
-
-const setLayerVisibility = (discipline, visible) => {
-  const modelGroup = viewer.getModelGroup();
-  for (const mesh of modelGroup.children) {
-    if (!mesh.isMesh) continue;
-    if (mesh.userData.discipline !== discipline) continue;
-    mesh.visible = visible;
-  }
-};
-
-const setLayerOpacity = (discipline, opacityPercent) => {
-  const opacity = Math.max(0, Math.min(100, opacityPercent)) / 100;
-  layerOpacityByDiscipline.set(discipline, opacity);
-
-  if (ui.isCollisionIsolationEnabled() && lastCollisionResult?.samplePairs?.length) {
-    applyCollisionIsolationView();
-    return;
-  }
-
-  const modelGroup = viewer.getModelGroup();
-  for (const mesh of modelGroup.children) {
-    if (!mesh.isMesh) continue;
-    if (mesh.userData.discipline !== discipline) continue;
-    applyMeshOpacity(mesh);
-  }
 };
 
 const focusCollisionPair = (pair) => {
@@ -156,7 +185,7 @@ const focusCollisionPair = (pair) => {
   selection.highlightCollisionPair(pair.leftMesh, pair.rightMesh, pair);
 };
 
-const loadIfcFile = async (file) => {
+const loadIfcFiles = async (files) => {
   ui.setLoading(true);
 
   try {
@@ -164,25 +193,19 @@ const loadIfcFile = async (file) => {
     resetModelGroup();
 
     const modelGroup = viewer.getModelGroup();
-    const { summary, disciplineCounts } = await ifcService.loadIntoGroup(file, modelGroup);
+    const { summary, disciplineCounts } = await ifcService.loadFilesIntoGroup(files, modelGroup);
     viewer.fitCameraToObject(modelGroup);
 
-    for (const discipline of Object.keys(disciplineCounts)) {
-      layerOpacityByDiscipline.set(discipline, 1);
-    }
+    lastDisciplineCounts = disciplineCounts;
 
     for (const mesh of modelGroup.children) {
       if (!mesh.isMesh) continue;
-      const material = mesh.material;
-      mesh.userData.baseOpacity = material?.opacity ?? 1;
-      applyMeshOpacity(mesh);
+      mesh.userData.baseOpacity = mesh.material?.opacity ?? 1;
     }
 
-    ui.renderLayerControls(disciplineCounts, {
-      onLayerToggle: setLayerVisibility,
-      onLayerOpacityChange: setLayerOpacity
-    });
-    ui.setCollisionLayerOptions(Object.keys(disciplineCounts));
+    layerManager.syncDefaultLayersFromCounts(disciplineCounts);
+    refreshLayersUi();
+    ui.setCollisionLayerOptions(layerManager.getLayerNames());
     ui.setCollisionOutput("Brak analizy kolizji.");
     ui.setBaseModelInfo(summary);
     ui.showModelInfo();
@@ -195,23 +218,27 @@ const loadIfcFile = async (file) => {
 };
 
 ui.loadButton.addEventListener("click", async () => {
-  const file = ui.fileInput.files?.[0];
-  if (!file) {
-    ui.writeOutput("Wybierz plik IFC przed uruchomieniem albo kliknij \"Zaladuj sample\".");
+  const files = ui.fileInput.files ? Array.from(ui.fileInput.files) : [];
+  if (files.length === 0) {
+    ui.writeOutput("Wybierz jeden lub wiele plikow IFC albo kliknij sample.");
     return;
   }
-  await loadIfcFile(file);
+  await loadIfcFiles(files);
 });
+
+const fetchSampleFile = async (relativePath, fileName) => {
+  const response = await fetch(`${import.meta.env.BASE_URL}${relativePath}`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} przy pobieraniu ${fileName}`);
+  }
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: "application/x-step" });
+};
 
 const loadSampleByPath = async (relativePath, fileName) => {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}${relativePath}`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} przy pobieraniu ${fileName}`);
-    }
-    const blob = await response.blob();
-    const file = new File([blob], fileName, { type: "application/x-step" });
-    await loadIfcFile(file);
+    const file = await fetchSampleFile(relativePath, fileName);
+    await loadIfcFiles([file]);
   } catch (error) {
     console.error(error);
     ui.writeOutput(`Blad ladowania sample: ${error?.message ?? String(error)}`);
@@ -224,6 +251,19 @@ ui.loadSampleButton.addEventListener("click", () => {
 
 ui.loadRealisticSampleButton.addEventListener("click", () => {
   loadSampleByPath("samples/office-building-with-errors.ifc", "office-building-with-errors.ifc");
+});
+
+ui.loadBothSamplesButton?.addEventListener("click", async () => {
+  try {
+    const files = await Promise.all([
+      fetchSampleFile("samples/test-building.ifc", "architecture-structure.ifc"),
+      fetchSampleFile("samples/office-building-with-errors.ifc", "mep-office-with-errors.ifc")
+    ]);
+    await loadIfcFiles(files);
+  } catch (error) {
+    console.error(error);
+    ui.writeOutput(`Blad ladowania sample: ${error?.message ?? String(error)}`);
+  }
 });
 
 ui.canvas.addEventListener("pointerdown", (event) => {
@@ -243,7 +283,6 @@ ui.canvas.addEventListener("pointerup", (event) => {
   const pickedMesh = viewer.getPick(event);
   if (!pickedMesh) return;
 
-  // In isolation mode keep dimming context; only update red focus to picked colliding mesh pair if possible.
   if (ui.isCollisionIsolationEnabled() && lastCollisionResult?.samplePairs?.length) {
     const relatedPair =
       lastCollisionResult.samplePairs.find(

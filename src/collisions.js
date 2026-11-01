@@ -1,7 +1,12 @@
 import * as THREE from "three";
 
 const getMeshesForLayer = (group, layerName) =>
-  group.children.filter((node) => node.isMesh && node.userData.discipline === layerName && node.visible);
+  group.children.filter(
+    (node) =>
+      node.isMesh &&
+      node.visible &&
+      (node.userData.layerName === layerName || node.userData.discipline === layerName)
+  );
 
 const getWorldBox = (mesh) => {
   if (!mesh.geometry.boundingBox) {
@@ -38,8 +43,8 @@ export const detectLayerCollisions = (group, layerA, layerB, maxSamples = 30) =>
           rightMesh: right.mesh,
           leftExpressId: left.mesh.userData.expressID ?? "brak",
           rightExpressId: right.mesh.userData.expressID ?? "brak",
-          leftDiscipline: left.mesh.userData.discipline ?? "brak",
-          rightDiscipline: right.mesh.userData.discipline ?? "brak"
+          leftDiscipline: left.mesh.userData.layerName ?? left.mesh.userData.discipline ?? "brak",
+          rightDiscipline: right.mesh.userData.layerName ?? right.mesh.userData.discipline ?? "brak"
         });
       }
     }

@@ -1,24 +1,22 @@
 import * as THREE from "three";
 import { IFC_TYPE_IDS } from "./constants.js";
-import { ALL_DISCIPLINES, getDisciplineForType } from "./disciplines.js";
+import { ALL_DISCIPLINES, buildElementSystemHints, resolveDiscipline } from "./disciplines.js";
 
 export const createIfcService = () => {
   let ifcApi = null;
   let initialized = false;
-  let currentModelId = null;
+  let openModelIds = [];
 
   const init = async () => {
     if (initialized) return;
     const { IfcAPI } = await import("web-ifc");
     ifcApi = new IfcAPI();
 
-    // Prefer local WASM served by Vite from /public/wasm
     const localWasmPath = `${import.meta.env.BASE_URL}wasm/`;
     try {
       await ifcApi.SetWasmPath(localWasmPath, true);
       await ifcApi.Init();
     } catch (localError) {
-      // Fallback to CDN if local wasm is missing
       await ifcApi.SetWasmPath("https://unpkg.com/web-ifc@0.0.77/", true);
       try {
         await ifcApi.Init();
@@ -32,24 +30,33 @@ export const createIfcService = () => {
     initialized = true;
   };
 
-  const closeCurrentModel = () => {
-    if (currentModelId === null || !ifcApi) return;
-    ifcApi.CloseModel(currentModelId);
-    currentModelId = null;
+  const closeAllModels = () => {
+    if (!ifcApi) return;
+    for (const modelId of openModelIds) {
+      try {
+        ifcApi.CloseModel(modelId);
+      } catch {
+        // ignore close errors on already disposed models
+      }
+    }
+    openModelIds = [];
   };
 
+  // Backwards-compatible alias used by main.js
+  const closeCurrentModel = () => closeAllModels();
+
   const extractBufferGeometry = (modelId, geometryId, geometryCache) => {
-    if (geometryCache.has(geometryId)) {
-      return geometryCache.get(geometryId);
+    const cacheKey = `${modelId}:${geometryId}`;
+    if (geometryCache.has(cacheKey)) {
+      return geometryCache.get(cacheKey);
     }
 
     const ifcGeometry = ifcApi.GetGeometry(modelId, geometryId);
     if (!ifcGeometry) {
-      geometryCache.set(geometryId, null);
+      geometryCache.set(cacheKey, null);
       return null;
     }
 
-    // Copy out of WASM memory before delete — shared geometryExpressID is reused across placements.
     const vertexData = Float32Array.from(
       ifcApi.GetVertexArray(ifcGeometry.GetVertexData(), ifcGeometry.GetVertexDataSize())
     );
@@ -59,7 +66,7 @@ export const createIfcService = () => {
     ifcGeometry.delete();
 
     if (!vertexData.length || !indexData.length) {
-      geometryCache.set(geometryId, null);
+      geometryCache.set(cacheKey, null);
       return null;
     }
 
@@ -80,7 +87,7 @@ export const createIfcService = () => {
     geometry.setAttribute("position", new THREE.BufferAttribute(positionArray, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(normalArray, 3));
     geometry.setIndex(new THREE.BufferAttribute(indexData, 1));
-    geometryCache.set(geometryId, geometry);
+    geometryCache.set(cacheKey, geometry);
     return geometry;
   };
 
@@ -93,7 +100,6 @@ export const createIfcService = () => {
     const b = color?.z ?? 0.75;
     const a = color?.w ?? 1;
 
-    // MeshLambertMaterial is reliably visible in WebGPURenderer with classic materials.
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(r, g, b),
       emissive: new THREE.Color(0x000000),
@@ -103,7 +109,6 @@ export const createIfcService = () => {
       side: THREE.DoubleSide
     });
 
-    // Clone so disposing one mesh does not destroy shared BufferGeometry used by other instances.
     const mesh = new THREE.Mesh(geometry.clone(), material);
     mesh.matrixAutoUpdate = false;
     mesh.matrix.fromArray(flatTransformation);
@@ -125,65 +130,58 @@ export const createIfcService = () => {
     };
   };
 
-  const readIfcSummary = (modelId, meshCount, duplicateReport, fileName, disciplineCounts) => {
-    const projectLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCPROJECT);
-    const wallLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCWALL);
-    const slabLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCSLAB);
-    const doorLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCDOOR);
+  const guessHintFromFileName = (fileName) => {
+    const name = String(fileName || "").toLowerCase();
+    return name;
+  };
 
+  const loadSingleFileIntoGroup = async (file, targetGroup, aggregates) => {
+    const buffer = await file.arrayBuffer();
+    const data = new Uint8Array(buffer);
+    const modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
+    if (modelId < 0) {
+      throw new Error(`OpenModel blad dla pliku: ${file.name}`);
+    }
+
+    openModelIds.push(modelId);
+    const geometryCache = new Map();
+    const systemHints = buildElementSystemHints(ifcApi, modelId);
+    const fileHint = guessHintFromFileName(file.name);
+    let meshesFromFile = 0;
     let projectName = "Nie znaleziono IfcProject";
+
+    const projectLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCPROJECT);
     if (projectLines.size() > 0) {
-      const firstProjectId = projectLines.get(0);
-      const projectData = ifcApi.GetLine(modelId, firstProjectId);
+      const projectData = ifcApi.GetLine(modelId, projectLines.get(0));
       projectName = projectData?.Name?.value ?? projectName;
     }
 
-    return [
-      `Plik: ${fileName}`,
-      `Nazwa projektu: ${projectName}`,
-      `IfcProject: ${projectLines.size()}`,
-      `IfcWall: ${wallLines.size()}`,
-      `IfcSlab: ${slabLines.size()}`,
-      `IfcDoor: ${doorLines.size()}`,
-      `Meshy 3D: ${meshCount}`,
-      `Duplikaty geometrii (ID): ${duplicateReport.duplicateGeometryCount}`,
-      `Instancje geometrii (powtorzenia): ${duplicateReport.duplicateGeometryInstances}`,
-      `Duplikaty elementow (ExpressID): ${duplicateReport.duplicateElementsCount}`,
-      ...Object.entries(disciplineCounts).map(([name, count]) => `${name}: ${count}`)
-    ].join("\n");
-  };
-
-  const loadIntoGroup = async (file, targetGroup) => {
-    if (!initialized || !ifcApi) {
-      throw new Error("web-ifc nie zostalo zainicjalizowane. Sprobuj odswiezyc strone.");
-    }
-
-    const buffer = await file.arrayBuffer();
-    const data = new Uint8Array(buffer);
-
-    closeCurrentModel();
-
-    const modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
-    if (modelId < 0) {
-      throw new Error("OpenModel zwrocil blad - plik IFC jest niepoprawny lub nieobslugiwany.");
-    }
-
-    currentModelId = modelId;
-    const geometryCounts = new Map();
-    const elementCounts = new Map();
-    const geometryCache = new Map();
-    const disciplineCounts = Object.fromEntries(ALL_DISCIPLINES.map((discipline) => [discipline, 0]));
-
     ifcApi.StreamAllMeshes(modelId, (mesh) => {
       const elementId = mesh.expressID;
-      elementCounts.set(elementId, (elementCounts.get(elementId) ?? 0) + 1);
+      const elementKey = `${file.name}:${elementId}`;
+      aggregates.elementCounts.set(elementKey, (aggregates.elementCounts.get(elementKey) ?? 0) + 1);
+
       const elementTypeId = ifcApi.GetLineType(modelId, elementId);
-      const discipline = getDisciplineForType(elementTypeId);
+      const elementTypeName = ifcApi.GetNameFromTypeCode(elementTypeId) || "UNKNOWN";
+
+      let elementLine = null;
+      try {
+        elementLine = ifcApi.GetLine(modelId, elementId, true);
+      } catch {
+        elementLine = null;
+      }
+
+      const discipline = resolveDiscipline({
+        typeId: elementTypeId,
+        line: elementLine,
+        systemHint: [systemHints.get(elementId) ?? "", fileHint].filter(Boolean).join(" ")
+      });
 
       for (let i = 0; i < mesh.geometries.size(); i += 1) {
         const placedGeometry = mesh.geometries.get(i);
         const geometryId = placedGeometry.geometryExpressID;
-        geometryCounts.set(geometryId, (geometryCounts.get(geometryId) ?? 0) + 1);
+        const geometryKey = `${modelId}:${geometryId}`;
+        aggregates.geometryCounts.set(geometryKey, (aggregates.geometryCounts.get(geometryKey) ?? 0) + 1);
 
         const modelMesh = createMeshFromIfcGeometry(
           modelId,
@@ -196,34 +194,90 @@ export const createIfcService = () => {
         if (!modelMesh) continue;
         modelMesh.userData.expressID = elementId;
         modelMesh.userData.geometryExpressID = geometryId;
+        modelMesh.userData.typeId = elementTypeId;
+        modelMesh.userData.typeName = elementTypeName;
+        modelMesh.userData.objectType = elementLine?.ObjectType?.value ?? elementLine?.ObjectType ?? null;
+        modelMesh.userData.name = elementLine?.Name?.value ?? elementLine?.Name ?? null;
         modelMesh.userData.discipline = discipline;
-        disciplineCounts[discipline] += 1;
+        modelMesh.userData.sourceFile = file.name;
+        modelMesh.userData.modelId = modelId;
+        aggregates.disciplineCounts[discipline] += 1;
+        meshesFromFile += 1;
         targetGroup.add(modelMesh);
       }
     });
 
-    // Cached templates are no longer needed after meshes cloned their own geometry.
     for (const cached of geometryCache.values()) {
       cached?.dispose?.();
     }
-    geometryCache.clear();
+
+    return {
+      fileName: file.name,
+      projectName,
+      meshCount: meshesFromFile,
+      modelId
+    };
+  };
+
+  const loadFilesIntoGroup = async (files, targetGroup) => {
+    if (!initialized || !ifcApi) {
+      throw new Error("web-ifc nie zostalo zainicjalizowane. Sprobuj odswiezyc strone.");
+    }
+
+    const fileList = Array.from(files || []).filter(Boolean);
+    if (fileList.length === 0) {
+      throw new Error("Nie wybrano zadnych plikow IFC.");
+    }
+
+    closeAllModels();
+
+    const aggregates = {
+      geometryCounts: new Map(),
+      elementCounts: new Map(),
+      disciplineCounts: Object.fromEntries(ALL_DISCIPLINES.map((discipline) => [discipline, 0]))
+    };
+
+    const fileReports = [];
+    for (const file of fileList) {
+      const report = await loadSingleFileIntoGroup(file, targetGroup, aggregates);
+      fileReports.push(report);
+    }
 
     targetGroup.updateMatrixWorld(true);
 
     if (targetGroup.children.length === 0) {
-      throw new Error("Model IFC zostal otwarty, ale nie zawiera geometrii 3D do wyrenderowania.");
+      throw new Error("Pliki IFC zostaly otwarte, ale nie zawieraja geometrii 3D do wyrenderowania.");
     }
 
-    const duplicateReport = buildDuplicateReport(geometryCounts, elementCounts);
+    const duplicateReport = buildDuplicateReport(aggregates.geometryCounts, aggregates.elementCounts);
+    const summary = [
+      `Wczytane pliki: ${fileReports.length}`,
+      ...fileReports.map(
+        (report, index) =>
+          `${index + 1}. ${report.fileName} | projekt: ${report.projectName} | meshy: ${report.meshCount}`
+      ),
+      `Meshy 3D (suma): ${targetGroup.children.length}`,
+      `Duplikaty geometrii (ID): ${duplicateReport.duplicateGeometryCount}`,
+      `Instancje geometrii (powtorzenia): ${duplicateReport.duplicateGeometryInstances}`,
+      `Duplikaty elementow (ExpressID/plik): ${duplicateReport.duplicateElementsCount}`,
+      ...Object.entries(aggregates.disciplineCounts).map(([name, count]) => `${name}: ${count}`)
+    ].join("\n");
+
     return {
-      summary: readIfcSummary(modelId, targetGroup.children.length, duplicateReport, file.name, disciplineCounts),
-      disciplineCounts
+      summary,
+      disciplineCounts: aggregates.disciplineCounts,
+      fileReports
     };
   };
+
+  // Single-file helper kept for compatibility.
+  const loadIntoGroup = async (file, targetGroup) => loadFilesIntoGroup([file], targetGroup);
 
   return {
     init,
     closeCurrentModel,
-    loadIntoGroup
+    closeAllModels,
+    loadIntoGroup,
+    loadFilesIntoGroup
   };
 };
