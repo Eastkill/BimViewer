@@ -24,35 +24,91 @@
           </div>
         </section>
 
-        <section class="card">
-          <h2>Informacje</h2>
-          <pre id="output">Brak danych. Wybierz plik IFC i kliknij "Wczytaj IFC".</pre>
-        </section>
+        <div id="viewerSidebarPanels">
+          <section class="card">
+            <h2>Informacje</h2>
+            <pre id="output">Brak danych. Wybierz plik IFC i kliknij "Wczytaj IFC".</pre>
+          </section>
 
-        <section class="card">
-          <h2>Warstwy</h2>
-          <p class="file-hint">Domyslne = branze. Mozesz dodac custom warstwy powiazane z plikiem albo entity.</p>
-          <div id="layerControls" class="layer-controls"></div>
-        </section>
+          <section class="card">
+            <h2>Warstwy</h2>
+            <p class="file-hint">Domyslne = branze. Mozesz dodac custom warstwy powiazane z plikiem albo entity.</p>
+            <div id="layerControls" class="layer-controls"></div>
+          </section>
 
-        <section class="card">
-          <h2>Kolizje miedzy warstwami</h2>
-          <div class="collision-controls">
-            <select id="collisionLayerA"></select>
-            <select id="collisionLayerB"></select>
-            <button id="detectCollisionsButton" type="button">Wykryj kolizje</button>
-            <label class="isolation-toggle">
-              <input id="collisionIsolationToggle" type="checkbox" />
-              <span>Tryb izolacji kolizji</span>
-            </label>
-            <p class="isolation-hint">Niekolidujace = polprzezroczyste, kolidujace = pelne i czerwone.</p>
-          </div>
-          <div id="collisionOutput" class="collision-output">Brak analizy kolizji.</div>
-        </section>
+          <section class="card">
+            <h2>Wyrównanie plików</h2>
+            <p class="file-hint">
+              Gdy modele z różnych branż mają inny punkt odniesienia, przesuń / obróć konkretny plik.
+            </p>
+            <div id="fileAlignControls" class="file-align-controls"></div>
+          </section>
+
+          <section class="card">
+            <h2>Kolizje miedzy warstwami</h2>
+            <div class="collision-controls">
+              <select id="collisionLayerA"></select>
+              <select id="collisionLayerB"></select>
+              <button id="detectCollisionsButton" type="button">Wykryj kolizje</button>
+              <label class="isolation-toggle">
+                <input id="collisionIsolationToggle" type="checkbox" />
+                <span>Tryb izolacji kolizji</span>
+              </label>
+              <p class="isolation-hint">Niekolidujace = przyciemnione, kolidujace = pelne i czerwone.</p>
+            </div>
+            <div id="collisionOutput" class="collision-output">Brak analizy kolizji.</div>
+          </section>
+        </div>
+
+        <div id="reportSidebarPanels" class="is-hidden">
+          <section class="card">
+            <h2>Raport materiałów</h2>
+            <p class="file-hint">
+              Estymacja zużycia na podstawie materiałów IFC, quantities (Qto) oraz geometrii 3D jako fallback.
+            </p>
+            <button id="refreshReportButton" type="button" class="secondary">Przelicz raport</button>
+          </section>
+        </div>
       </aside>
 
-      <section class="viewport">
-        <canvas id="viewerCanvas" aria-label="Podglad modelu IFC"></canvas>
+      <section class="main-panel">
+        <div class="app-tabs" role="tablist" aria-label="Widok aplikacji">
+          <button id="tabViewerButton" type="button" class="app-tab active" role="tab" aria-selected="true">
+            Widok 3D
+          </button>
+          <button id="tabReportButton" type="button" class="app-tab" role="tab" aria-selected="false">
+            Raport
+          </button>
+        </div>
+
+        <div id="viewerTabPanel" class="tab-panel active" role="tabpanel">
+          <div class="viewport">
+            <canvas id="viewerCanvas" aria-label="Podglad modelu IFC"></canvas>
+            <div class="view-gizmo" aria-label="Orientacja kamery">
+              <button type="button" class="view-gizmo-btn" data-view="top" title="Widok z góry (Top)">Top</button>
+              <button type="button" class="view-gizmo-btn" data-view="left" title="Widok z lewej (Left)">L</button>
+              <button type="button" class="view-gizmo-btn" data-view="front" title="Widok z przodu (Front)">F</button>
+              <button type="button" class="view-gizmo-btn" data-view="right" title="Widok z prawej (Right)">R</button>
+              <button type="button" class="view-gizmo-btn" data-view="back" title="Widok z tylu (Back)">B</button>
+              <button type="button" class="view-gizmo-btn" data-view="bottom" title="Widok z dolu (Bottom)">Bot</button>
+              <button type="button" class="view-gizmo-btn view-gizmo-iso" data-view="iso" title="Widok izometryczny">Iso</button>
+              <button
+                type="button"
+                class="view-gizmo-btn view-gizmo-projection"
+                data-projection="toggle"
+                title="Przelacz projekcje: perspektywa / ortogonalna"
+              >
+                Persp
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="reportTabPanel" class="tab-panel" role="tabpanel" hidden>
+          <div id="materialReport" class="material-report">
+            <p class="file-hint">Wczytaj model IFC, aby wygenerować raport materiałów.</p>
+          </div>
+        </div>
       </section>
     </main>
 

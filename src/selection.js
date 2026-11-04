@@ -1,63 +1,65 @@
-const hasEmissive = (material) =>
-  Boolean(material && material.emissive && typeof material.emissive.setHex === "function");
+import { syncEntityAppearance } from "./entities.js";
 
-const restoreMeshHighlight = (mesh) => {
-  const material = mesh.material;
-  if (!hasEmissive(material) || !mesh.userData.originalEmissive) return;
-  material.emissive.copy(mesh.userData.originalEmissive);
-  material.emissiveIntensity = mesh.userData.originalEmissiveIntensity ?? 1;
-  delete mesh.userData.originalEmissive;
-  delete mesh.userData.originalEmissiveIntensity;
-  delete mesh.userData.highlightMode;
+const HIGHLIGHT_COLLISION = { r: 0.937, g: 0.267, b: 0.267 };
+
+const restoreEntityHighlight = (entity) => {
+  entity.highlightColor = null;
+  syncEntityAppearance(entity);
 };
 
-const applyMeshHighlight = (mesh, colorHex, intensity) => {
-  const material = mesh.material;
-  if (!hasEmissive(material)) return;
-
-  if (!mesh.userData.originalEmissive) {
-    mesh.userData.originalEmissive = material.emissive.clone();
-    mesh.userData.originalEmissiveIntensity = material.emissiveIntensity ?? 1;
-  }
-
-  material.emissive.setHex(colorHex);
-  material.emissiveIntensity = intensity;
+const applyEntityHighlight = (entity, color) => {
+  entity.highlightColor = color;
+  syncEntityAppearance(entity);
 };
 
-export const createSelectionManager = ({ showModelInfo }) => {
-  let selectedMeshes = [];
+export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {}) => {
+  let selectedEntities = [];
+  let selectionToken = 0;
 
   const clearSelection = () => {
-    for (const mesh of selectedMeshes) {
-      restoreMeshHighlight(mesh);
+    selectionToken += 1;
+    for (const entity of selectedEntities) {
+      restoreEntityHighlight(entity);
     }
-    selectedMeshes = [];
+    selectedEntities = [];
   };
 
-  const selectMeshes = (meshes, { colorHex = 0x22d3ee, intensity = 0.65, infoText = null } = {}) => {
-    const unique = [...new Set(meshes.filter(Boolean))];
+  const selectMeshes = (entities, { colorHex = 0x22d3ee, intensity = 0.65, infoText = null } = {}) => {
+    const unique = [...new Set(entities.filter(Boolean))];
     clearSelection();
-    selectedMeshes = unique;
+    selectedEntities = unique;
 
-    for (const mesh of selectedMeshes) {
-      applyMeshHighlight(mesh, colorHex, intensity);
-      mesh.userData.highlightMode = colorHex === 0xef4444 ? "collision" : "selection";
+    const color =
+      colorHex === 0xef4444
+        ? HIGHLIGHT_COLLISION
+        : {
+            r: ((colorHex >> 16) & 255) / 255,
+            g: ((colorHex >> 8) & 255) / 255,
+            b: (colorHex & 255) / 255
+          };
+
+    // intensity kept for API compat; color is already tuned for batch tinting
+    void intensity;
+
+    for (const entity of selectedEntities) {
+      applyEntityHighlight(entity, color);
     }
 
     if (infoText) {
-      showModelInfo(infoText);
+      showModelInfo?.(infoText);
     }
   };
 
-  const formatMeshInfo = (label, mesh, pairMeta = {}) => {
-    const expressId = pairMeta.expressId ?? mesh?.userData.expressID ?? "brak";
-    const geometryId = mesh?.userData.geometryExpressID ?? "brak";
-    const typeId = mesh?.userData.typeId ?? "brak";
-    const typeName = mesh?.userData.typeName ?? "brak";
-    const discipline = pairMeta.discipline ?? mesh?.userData.discipline ?? "brak";
-    const objectType = mesh?.userData.objectType ?? "brak";
-    const name = mesh?.userData.name ?? "brak";
-    const sourceFile = mesh?.userData.sourceFile ?? "brak";
+  const formatMeshInfo = (label, entity, pairMeta = {}) => {
+    const expressId = pairMeta.expressId ?? entity?.expressID ?? "brak";
+    const geometryId = entity?.geometryExpressID ?? "brak";
+    const typeId = entity?.typeId ?? "brak";
+    const typeName = entity?.typeName ?? "brak";
+    const discipline = pairMeta.discipline ?? entity?.discipline ?? "brak";
+    const objectType = entity?.objectType ?? "brak";
+    const name = entity?.name ?? "brak";
+    const sourceFile = entity?.sourceFile ?? "brak";
+    const material = pairMeta.material ?? entity?.materialLabel ?? "…";
     return [
       `${label}:`,
       `Plik: ${sourceFile}`,
@@ -67,37 +69,80 @@ export const createSelectionManager = ({ showModelInfo }) => {
       `Entity: ${typeName}`,
       `Name: ${name}`,
       `ObjectType: ${objectType}`,
+      `Material: ${material}`,
       `Branza: ${discipline}`,
-      `Warstwa: ${mesh?.userData.layerName ?? "brak"}`
+      `Warstwa: ${entity?.layerName ?? "brak"}`
     ].join("\n");
   };
 
-  const selectMesh = (mesh) => {
-    selectMeshes([mesh], {
-      colorHex: 0x22d3ee,
-      intensity: 0.6,
-      infoText: formatMeshInfo("Zaznaczenie", mesh)
-    });
+  const enrichEntityMaterial = async (entity, token) => {
+    if (!entity || !resolveMaterials) return entity?.materialLabel ?? "brak";
+    if (entity.materialLabel && entity.materialLabel !== "…") return entity.materialLabel;
+
+    const label = await resolveMaterials(entity);
+    if (token !== selectionToken) return label;
+    entity.materialLabel = label || "brak";
+    return entity.materialLabel;
   };
 
-  const highlightCollisionPair = (leftMesh, rightMesh, pairMeta = {}) => {
-    selectMeshes([leftMesh, rightMesh], {
+  const selectMesh = async (entity) => {
+    const token = selectionToken + 1;
+    selectMeshes([entity], {
+      colorHex: 0x22d3ee,
+      intensity: 0.6,
+      infoText: formatMeshInfo("Zaznaczenie", entity, { material: entity?.materialLabel ?? "…" })
+    });
+
+    const material = await enrichEntityMaterial(entity, token);
+    if (token !== selectionToken) return;
+    showModelInfo?.(formatMeshInfo("Zaznaczenie", entity, { material }));
+  };
+
+  const highlightCollisionPair = async (leftEntity, rightEntity, pairMeta = {}) => {
+    const token = selectionToken + 1;
+    selectMeshes([leftEntity, rightEntity], {
       colorHex: 0xef4444,
       intensity: 0.95,
       infoText: [
         "Kolizja (czerwone podswietlenie):",
         "",
-        formatMeshInfo("A", leftMesh, {
+        formatMeshInfo("A", leftEntity, {
           expressId: pairMeta.leftExpressId,
-          discipline: pairMeta.leftDiscipline
+          discipline: pairMeta.leftDiscipline,
+          material: leftEntity?.materialLabel ?? "…"
         }),
         "",
-        formatMeshInfo("B", rightMesh, {
+        formatMeshInfo("B", rightEntity, {
           expressId: pairMeta.rightExpressId,
-          discipline: pairMeta.rightDiscipline
+          discipline: pairMeta.rightDiscipline,
+          material: rightEntity?.materialLabel ?? "…"
         })
       ].join("\n")
     });
+
+    const [leftMaterial, rightMaterial] = await Promise.all([
+      enrichEntityMaterial(leftEntity, token),
+      enrichEntityMaterial(rightEntity, token)
+    ]);
+    if (token !== selectionToken) return;
+
+    showModelInfo?.(
+      [
+        "Kolizja (czerwone podswietlenie):",
+        "",
+        formatMeshInfo("A", leftEntity, {
+          expressId: pairMeta.leftExpressId,
+          discipline: pairMeta.leftDiscipline,
+          material: leftMaterial
+        }),
+        "",
+        formatMeshInfo("B", rightEntity, {
+          expressId: pairMeta.rightExpressId,
+          discipline: pairMeta.rightDiscipline,
+          material: rightMaterial
+        })
+      ].join("\n")
+    );
   };
 
   return {

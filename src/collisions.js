@@ -1,30 +1,20 @@
-import * as THREE from "three";
+import { getEntities, getEntityWorldBox } from "./entities.js";
 
-const getMeshesForLayer = (group, layerName) =>
-  group.children.filter(
-    (node) =>
-      node.isMesh &&
-      node.visible &&
-      (node.userData.layerName === layerName || node.userData.discipline === layerName)
+const getEntitiesForLayer = (group, layerName) =>
+  getEntities(group).filter(
+    (entity) =>
+      entity.layerVisible !== false &&
+      (entity.layerName === layerName || entity.discipline === layerName)
   );
-
-const getWorldBox = (mesh) => {
-  if (!mesh.geometry.boundingBox) {
-    mesh.geometry.computeBoundingBox();
-  }
-  const worldBox = new THREE.Box3();
-  worldBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-  return worldBox;
-};
 
 export const detectLayerCollisions = (group, layerA, layerB, maxSamples = 30) => {
   group.updateMatrixWorld(true);
-  const meshesA = getMeshesForLayer(group, layerA);
-  const meshesB = getMeshesForLayer(group, layerB);
+  const entitiesA = getEntitiesForLayer(group, layerA);
+  const entitiesB = getEntitiesForLayer(group, layerB);
 
   const sameLayer = layerA === layerB;
-  const boxesA = meshesA.map((mesh) => ({ mesh, box: getWorldBox(mesh) }));
-  const boxesB = sameLayer ? boxesA : meshesB.map((mesh) => ({ mesh, box: getWorldBox(mesh) }));
+  const boxesA = entitiesA.map((entity) => ({ entity, box: getEntityWorldBox(entity) }));
+  const boxesB = sameLayer ? boxesA : entitiesB.map((entity) => ({ entity, box: getEntityWorldBox(entity) }));
 
   let collisionsCount = 0;
   const samplePairs = [];
@@ -39,12 +29,12 @@ export const detectLayerCollisions = (group, layerA, layerB, maxSamples = 30) =>
       if (samplePairs.length < maxSamples) {
         samplePairs.push({
           id: samplePairs.length,
-          leftMesh: left.mesh,
-          rightMesh: right.mesh,
-          leftExpressId: left.mesh.userData.expressID ?? "brak",
-          rightExpressId: right.mesh.userData.expressID ?? "brak",
-          leftDiscipline: left.mesh.userData.layerName ?? left.mesh.userData.discipline ?? "brak",
-          rightDiscipline: right.mesh.userData.layerName ?? right.mesh.userData.discipline ?? "brak"
+          leftMesh: left.entity,
+          rightMesh: right.entity,
+          leftExpressId: left.entity.expressID ?? "brak",
+          rightExpressId: right.entity.expressID ?? "brak",
+          leftDiscipline: left.entity.layerName ?? left.entity.discipline ?? "brak",
+          rightDiscipline: right.entity.layerName ?? right.entity.discipline ?? "brak"
         });
       }
     }
@@ -55,7 +45,7 @@ export const detectLayerCollisions = (group, layerA, layerB, maxSamples = 30) =>
     layerB,
     collisionsCount,
     samplePairs,
-    testedA: meshesA.length,
-    testedB: meshesB.length
+    testedA: entitiesA.length,
+    testedB: entitiesB.length
   };
 };

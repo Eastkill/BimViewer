@@ -1,6 +1,18 @@
 import * as THREE from "three";
 import { IFC_TYPE_IDS } from "./constants.js";
 import { ALL_DISCIPLINES, buildElementSystemHints, resolveDiscipline } from "./disciplines.js";
+import {
+  buildFileCacheKey,
+  getCachedProcessedFile,
+  hydrateGeometryCache,
+  IFC_CACHE_SCHEMA_VERSION,
+  rebuildPlacementsFromCache,
+  serializeGeometries,
+  serializePlacements,
+  setCachedProcessedFile
+} from "./ifc-cache.js";
+import { buildMaterialTakeoffReport } from "./material-takeoff.js";
+import { formatMaterialsLabel } from "./materials.js";
 
 export const createIfcService = () => {
   let ifcApi = null;
@@ -87,33 +99,9 @@ export const createIfcService = () => {
     geometry.setAttribute("position", new THREE.BufferAttribute(positionArray, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(normalArray, 3));
     geometry.setIndex(new THREE.BufferAttribute(indexData, 1));
+    geometry.computeBoundingBox();
     geometryCache.set(cacheKey, geometry);
     return geometry;
-  };
-
-  const createMeshFromIfcGeometry = (modelId, flatTransformation, geometryId, color, geometryCache) => {
-    const geometry = extractBufferGeometry(modelId, geometryId, geometryCache);
-    if (!geometry) return null;
-
-    const r = color?.x ?? 0.75;
-    const g = color?.y ?? 0.75;
-    const b = color?.z ?? 0.75;
-    const a = color?.w ?? 1;
-
-    const material = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(r, g, b),
-      emissive: new THREE.Color(0x000000),
-      emissiveIntensity: 1,
-      transparent: a < 0.999,
-      opacity: a,
-      side: THREE.DoubleSide
-    });
-
-    const mesh = new THREE.Mesh(geometry.clone(), material);
-    mesh.matrixAutoUpdate = false;
-    mesh.matrix.fromArray(flatTransformation);
-    mesh.updateMatrixWorld(true);
-    return mesh;
   };
 
   const buildDuplicateReport = (geometryCounts, elementCounts) => {
@@ -130,31 +118,139 @@ export const createIfcService = () => {
     };
   };
 
-  const guessHintFromFileName = (fileName) => {
-    const name = String(fileName || "").toLowerCase();
-    return name;
-  };
+  const guessHintFromFileName = (fileName) => String(fileName || "").toLowerCase();
 
-  const loadSingleFileIntoGroup = async (file, targetGroup, aggregates) => {
-    const buffer = await file.arrayBuffer();
-    const data = new Uint8Array(buffer);
-    const modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
-    if (modelId < 0) {
-      throw new Error(`OpenModel blad dla pliku: ${file.name}`);
+  const createBatchMaterial = (transparent) =>
+    new THREE.MeshLambertMaterial({
+      color: 0xffffff,
+      emissive: 0x000000,
+      emissiveIntensity: 1,
+      transparent,
+      opacity: 1,
+      depthWrite: !transparent,
+      side: THREE.DoubleSide
+    });
+
+  const buildBatchedMeshes = (placements, geometryCache) => {
+    const opaquePlacements = [];
+    const transparentPlacements = [];
+
+    for (const placement of placements) {
+      if (placement.opacity < 0.999) transparentPlacements.push(placement);
+      else opaquePlacements.push(placement);
     }
 
-    openModelIds.push(modelId);
-    const geometryCache = new Map();
-    const systemHints = buildElementSystemHints(ifcApi, modelId);
-    const fileHint = guessHintFromFileName(file.name);
-    let meshesFromFile = 0;
-    let projectName = "Nie znaleziono IfcProject";
+    const batches = [];
+    const entities = [];
 
+    const buildOneBatch = (batchPlacements, transparent) => {
+      if (batchPlacements.length === 0) return;
+
+      const uniqueGeometries = new Map();
+      let maxVertexCount = 0;
+      let maxIndexCount = 0;
+
+      for (const placement of batchPlacements) {
+        if (uniqueGeometries.has(placement.geometryKey)) continue;
+        const geometry = geometryCache.get(placement.geometryKey);
+        if (!geometry) continue;
+        uniqueGeometries.set(placement.geometryKey, geometry);
+        maxVertexCount += geometry.getAttribute("position").count;
+        maxIndexCount += geometry.getIndex()?.count ?? geometry.getAttribute("position").count;
+      }
+
+      if (uniqueGeometries.size === 0) return;
+
+      const batch = new THREE.BatchedMesh(
+        batchPlacements.length,
+        Math.max(1, maxVertexCount),
+        Math.max(1, maxIndexCount),
+        createBatchMaterial(transparent)
+      );
+      batch.perObjectFrustumCulled = true;
+      batch.frustumCulled = true;
+      batch.userData.entityByInstanceId = new Map();
+      batch.userData.transparent = transparent;
+
+      const geometryIdByKey = new Map();
+      for (const [geometryKey, geometry] of uniqueGeometries) {
+        geometryIdByKey.set(geometryKey, batch.addGeometry(geometry));
+      }
+
+      const matrix = new THREE.Matrix4();
+      const color4 = new THREE.Vector4();
+
+      for (const placement of batchPlacements) {
+        const geometryId = geometryIdByKey.get(placement.geometryKey);
+        if (geometryId == null) continue;
+
+        const instanceId = batch.addInstance(geometryId);
+        matrix.fromArray(placement.flatTransformation);
+        batch.setMatrixAt(instanceId, matrix);
+        color4.set(placement.color.r, placement.color.g, placement.color.b, placement.opacity);
+        batch.setColorAt(instanceId, color4);
+
+        const entity = {
+          batch,
+          instanceId,
+          expressID: placement.expressID,
+          geometryExpressID: placement.geometryExpressID,
+          typeId: placement.typeId,
+          typeName: placement.typeName,
+          objectType: placement.objectType,
+          name: placement.name,
+          discipline: placement.discipline,
+          sourceFile: placement.sourceFile,
+          modelId: placement.modelId,
+          baseColor: { ...placement.color },
+          baseOpacity: placement.opacity,
+          layerId: null,
+          layerName: null,
+          layerVisible: true,
+          layerOpacity: 1,
+          isolationVisible: true,
+          isolationOpacity: 1,
+          isolationDim: 1,
+          highlightColor: null
+        };
+
+        batch.userData.entityByInstanceId.set(instanceId, entity);
+        entities.push(entity);
+      }
+
+      batch.computeBoundingBox();
+      batch.computeBoundingSphere();
+      batches.push(batch);
+    };
+
+    buildOneBatch(opaquePlacements, false);
+    buildOneBatch(transparentPlacements, true);
+    return { batches, entities };
+  };
+
+  const openIfcModel = (data, fileName) => {
+    const modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
+    if (modelId < 0) {
+      throw new Error(`OpenModel blad dla pliku: ${fileName}`);
+    }
+    openModelIds.push(modelId);
+    return modelId;
+  };
+
+  const readProjectName = (modelId) => {
+    let projectName = "Nie znaleziono IfcProject";
     const projectLines = ifcApi.GetLineIDsWithType(modelId, IFC_TYPE_IDS.IFCPROJECT);
     if (projectLines.size() > 0) {
       const projectData = ifcApi.GetLine(modelId, projectLines.get(0));
       projectName = projectData?.Name?.value ?? projectName;
     }
+    return projectName;
+  };
+
+  const parseFilePlacements = (file, modelId, aggregates, allPlacements, geometryCache) => {
+    const systemHints = buildElementSystemHints(ifcApi, modelId);
+    const fileHint = guessHintFromFileName(file.name);
+    let meshesFromFile = 0;
 
     ifcApi.StreamAllMeshes(modelId, (mesh) => {
       const elementId = mesh.expressID;
@@ -183,39 +279,98 @@ export const createIfcService = () => {
         const geometryKey = `${modelId}:${geometryId}`;
         aggregates.geometryCounts.set(geometryKey, (aggregates.geometryCounts.get(geometryKey) ?? 0) + 1);
 
-        const modelMesh = createMeshFromIfcGeometry(
-          modelId,
-          placedGeometry.flatTransformation,
-          geometryId,
-          placedGeometry.color,
-          geometryCache
-        );
+        const geometry = extractBufferGeometry(modelId, geometryId, geometryCache);
+        if (!geometry) continue;
 
-        if (!modelMesh) continue;
-        modelMesh.userData.expressID = elementId;
-        modelMesh.userData.geometryExpressID = geometryId;
-        modelMesh.userData.typeId = elementTypeId;
-        modelMesh.userData.typeName = elementTypeName;
-        modelMesh.userData.objectType = elementLine?.ObjectType?.value ?? elementLine?.ObjectType ?? null;
-        modelMesh.userData.name = elementLine?.Name?.value ?? elementLine?.Name ?? null;
-        modelMesh.userData.discipline = discipline;
-        modelMesh.userData.sourceFile = file.name;
-        modelMesh.userData.modelId = modelId;
+        const r = placedGeometry.color?.x ?? 0.75;
+        const g = placedGeometry.color?.y ?? 0.75;
+        const b = placedGeometry.color?.z ?? 0.75;
+        const a = placedGeometry.color?.w ?? 1;
+
+        allPlacements.push({
+          geometryKey,
+          flatTransformation: placedGeometry.flatTransformation,
+          color: { r, g, b },
+          opacity: a,
+          expressID: elementId,
+          geometryExpressID: geometryId,
+          typeId: elementTypeId,
+          typeName: elementTypeName,
+          objectType: elementLine?.ObjectType?.value ?? elementLine?.ObjectType ?? null,
+          name: elementLine?.Name?.value ?? elementLine?.Name ?? null,
+          discipline,
+          sourceFile: file.name,
+          modelId
+        });
+
         aggregates.disciplineCounts[discipline] += 1;
         meshesFromFile += 1;
-        targetGroup.add(modelMesh);
       }
     });
 
-    for (const cached of geometryCache.values()) {
-      cached?.dispose?.();
+    return meshesFromFile;
+  };
+
+  const applyCachedPlacementsToAggregates = (placements, fileName, aggregates) => {
+    for (const placement of placements) {
+      const elementKey = `${fileName}:${placement.expressID}`;
+      aggregates.elementCounts.set(elementKey, (aggregates.elementCounts.get(elementKey) ?? 0) + 1);
+      aggregates.geometryCounts.set(
+        placement.geometryKey,
+        (aggregates.geometryCounts.get(placement.geometryKey) ?? 0) + 1
+      );
+      aggregates.disciplineCounts[placement.discipline] =
+        (aggregates.disciplineCounts[placement.discipline] ?? 0) + 1;
     }
+  };
+
+  const loadSingleFilePlacements = async (file, aggregates, allPlacements, geometryCache) => {
+    const buffer = await file.arrayBuffer();
+    const data = new Uint8Array(buffer);
+    const cacheKey = await buildFileCacheKey(file, data);
+    const cached = await getCachedProcessedFile(cacheKey);
+
+    if (
+      cached?.schemaVersion === IFC_CACHE_SCHEMA_VERSION &&
+      cached?.placements?.length &&
+      cached?.geometries
+    ) {
+      const modelId = openIfcModel(data, file.name);
+      hydrateGeometryCache(cached.geometries, modelId, geometryCache);
+      const placements = rebuildPlacementsFromCache(cached.placements, file.name, modelId);
+      allPlacements.push(...placements);
+      applyCachedPlacementsToAggregates(placements, file.name, aggregates);
+
+      return {
+        fileName: file.name,
+        projectName: cached.projectName || readProjectName(modelId),
+        meshCount: placements.length,
+        modelId,
+        cache: "hit",
+        cacheKey
+      };
+    }
+
+    const modelId = openIfcModel(data, file.name);
+    const projectName = readProjectName(modelId);
+    const meshCount = parseFilePlacements(file, modelId, aggregates, allPlacements, geometryCache);
+
+    // Fire-and-forget persist; load should not wait on IndexedDB write.
+    void setCachedProcessedFile({
+      key: cacheKey,
+      fileName: file.name,
+      projectName,
+      placements: serializePlacements(allPlacements),
+      geometries: serializeGeometries(geometryCache, allPlacements)
+    });
 
     return {
       fileName: file.name,
       projectName,
-      meshCount: meshesFromFile,
-      modelId
+      meshCount,
+      modelId,
+      cache: "miss",
+      cacheKey
     };
   };
 
@@ -237,26 +392,68 @@ export const createIfcService = () => {
       disciplineCounts: Object.fromEntries(ALL_DISCIPLINES.map((discipline) => [discipline, 0]))
     };
 
+    const geometryCache = new Map();
+    const allEntities = [];
+    const allBatches = [];
+    const fileGroups = [];
     const fileReports = [];
+
     for (const file of fileList) {
-      const report = await loadSingleFileIntoGroup(file, targetGroup, aggregates);
+      const filePlacements = [];
+      const report = await loadSingleFilePlacements(file, aggregates, filePlacements, geometryCache);
       fileReports.push(report);
+
+      if (filePlacements.length === 0) continue;
+
+      const { batches, entities } = buildBatchedMeshes(filePlacements, geometryCache);
+      const fileGroup = new THREE.Group();
+      fileGroup.name = file.name;
+      fileGroup.userData.sourceFile = file.name;
+      fileGroup.userData.isFileGroup = true;
+
+      for (const batch of batches) {
+        batch.userData.sourceFile = file.name;
+        fileGroup.add(batch);
+        allBatches.push(batch);
+      }
+
+      allEntities.push(...entities);
+      targetGroup.add(fileGroup);
+      fileGroups.push({
+        name: file.name,
+        group: fileGroup,
+        transform: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+        meshCount: entities.length
+      });
     }
 
-    targetGroup.updateMatrixWorld(true);
+    for (const cached of geometryCache.values()) {
+      cached?.dispose?.();
+    }
 
-    if (targetGroup.children.length === 0) {
+    if (allEntities.length === 0) {
       throw new Error("Pliki IFC zostaly otwarte, ale nie zawieraja geometrii 3D do wyrenderowania.");
     }
 
+    targetGroup.userData.entities = allEntities;
+    targetGroup.userData.batches = allBatches;
+    targetGroup.userData.fileGroups = fileGroups;
+    targetGroup.updateMatrixWorld(true);
+
     const duplicateReport = buildDuplicateReport(aggregates.geometryCounts, aggregates.elementCounts);
+    const cacheHits = fileReports.filter((report) => report.cache === "hit").length;
+    const cacheMisses = fileReports.filter((report) => report.cache === "miss").length;
     const summary = [
       `Wczytane pliki: ${fileReports.length}`,
       ...fileReports.map(
         (report, index) =>
-          `${index + 1}. ${report.fileName} | projekt: ${report.projectName} | meshy: ${report.meshCount}`
+          `${index + 1}. ${report.fileName} | projekt: ${report.projectName} | meshy: ${report.meshCount} | cache: ${report.cache}`
       ),
-      `Meshy 3D (suma): ${targetGroup.children.length}`,
+      `Cache geometrii: ${cacheHits} hit / ${cacheMisses} miss`,
+      `Elementy 3D (suma): ${allEntities.length}`,
+      `Draw calle (BatchedMesh): ${allBatches.length}`,
+      `Grupy plikow (do wyrównania): ${fileGroups.length}`,
+      `Unikalne geometrie: ${aggregates.geometryCounts.size}`,
       `Duplikaty geometrii (ID): ${duplicateReport.duplicateGeometryCount}`,
       `Instancje geometrii (powtorzenia): ${duplicateReport.duplicateGeometryInstances}`,
       `Duplikaty elementow (ExpressID/plik): ${duplicateReport.duplicateElementsCount}`,
@@ -266,18 +463,65 @@ export const createIfcService = () => {
     return {
       summary,
       disciplineCounts: aggregates.disciplineCounts,
-      fileReports
+      fileReports,
+      fileGroups,
+      cacheStats: { hits: cacheHits, misses: cacheMisses }
     };
   };
 
   // Single-file helper kept for compatibility.
   const loadIntoGroup = async (file, targetGroup) => loadFilesIntoGroup([file], targetGroup);
 
+  const getElementMaterialNodes = async (modelId, expressID) => {
+    if (!initialized || !ifcApi || modelId == null || expressID == null) return [];
+    try {
+      const fromElement = await ifcApi.properties.getMaterialsProperties(modelId, expressID, true, false);
+      const fromType = await ifcApi.properties.getMaterialsProperties(modelId, expressID, true, true);
+      return [...(fromElement || []), ...(fromType || [])];
+    } catch {
+      return [];
+    }
+  };
+
+  const getElementMaterialsLabel = async (modelId, expressID) => {
+    const nodes = await getElementMaterialNodes(modelId, expressID);
+    return formatMaterialsLabel(nodes);
+  };
+
+  const getElementQuantityPsets = async (modelId, expressID) => {
+    if (!initialized || !ifcApi || modelId == null || expressID == null) return [];
+    try {
+      const fromElement = await ifcApi.properties.getPropertySets(modelId, expressID, true, false);
+      let fromType = [];
+      try {
+        fromType = await ifcApi.properties.getPropertySets(modelId, expressID, true, true);
+      } catch {
+        fromType = [];
+      }
+      return [...(fromElement || []), ...(fromType || [])];
+    } catch {
+      return [];
+    }
+  };
+
+  const buildProjectMaterialTakeoff = async (entities) => {
+    if (!initialized || !ifcApi) {
+      throw new Error("web-ifc nie zostalo zainicjalizowane.");
+    }
+    return buildMaterialTakeoffReport({
+      entities,
+      getMaterialsNodes: getElementMaterialNodes,
+      getQuantityPsets: getElementQuantityPsets
+    });
+  };
+
   return {
     init,
     closeCurrentModel,
     closeAllModels,
     loadIntoGroup,
-    loadFilesIntoGroup
+    loadFilesIntoGroup,
+    getElementMaterialsLabel,
+    buildProjectMaterialTakeoff
   };
 };

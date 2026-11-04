@@ -1,3 +1,5 @@
+import { getEntities, refreshBatchTransparency, syncEntityAppearance } from "./entities.js";
+
 let layerSeq = 1;
 
 const createLayer = ({ name, kind, binding }) => ({
@@ -9,16 +11,16 @@ const createLayer = ({ name, kind, binding }) => ({
   binding // { type: "discipline"|"file"|"entity", value: string }
 });
 
-const meshMatchesBinding = (mesh, binding) => {
+const entityMatchesBinding = (entity, binding) => {
   if (!binding) return false;
   if (binding.type === "discipline") {
-    return mesh.userData.discipline === binding.value;
+    return entity.discipline === binding.value;
   }
   if (binding.type === "file") {
-    return mesh.userData.sourceFile === binding.value;
+    return entity.sourceFile === binding.value;
   }
   if (binding.type === "entity") {
-    return mesh.userData.typeName === binding.value;
+    return entity.typeName === binding.value;
   }
   return false;
 };
@@ -104,7 +106,7 @@ export const createLayerManager = () => {
   };
 
   /**
-   * Assign each mesh to exactly one layer.
+   * Assign each entity to exactly one layer.
    * Custom bindings win over defaults (later custom layers override earlier ones).
    */
   const assignMeshes = (modelGroup) => {
@@ -112,15 +114,13 @@ export const createLayerManager = () => {
     const customs = layers.filter((layer) => layer.kind === "custom");
     const counts = Object.fromEntries(layers.map((layer) => [layer.id, 0]));
 
-    for (const mesh of modelGroup.children) {
-      if (!mesh.isMesh) continue;
-
+    for (const entity of getEntities(modelGroup)) {
       let assigned = null;
 
       // Later custom layers take precedence.
       for (let i = customs.length - 1; i >= 0; i -= 1) {
         const custom = customs[i];
-        if (meshMatchesBinding(mesh, custom.binding)) {
+        if (entityMatchesBinding(entity, custom.binding)) {
           assigned = custom;
           break;
         }
@@ -128,48 +128,47 @@ export const createLayerManager = () => {
 
       if (!assigned) {
         assigned =
-          defaults.find((layer) => meshMatchesBinding(mesh, layer.binding)) ??
+          defaults.find((layer) => entityMatchesBinding(entity, layer.binding)) ??
           defaults.find((layer) => layer.binding?.value === "Inne") ??
           defaults[0] ??
           null;
       }
 
       if (!assigned) {
-        mesh.userData.layerId = null;
-        mesh.userData.layerName = "brak";
+        entity.layerId = null;
+        entity.layerName = "brak";
         continue;
       }
 
-      mesh.userData.layerId = assigned.id;
-      mesh.userData.layerName = assigned.name;
+      entity.layerId = assigned.id;
+      entity.layerName = assigned.name;
       counts[assigned.id] += 1;
     }
 
     return counts;
   };
 
-  const applyVisibilityAndOpacity = (modelGroup, { setMeshOpacity }) => {
-    for (const mesh of modelGroup.children) {
-      if (!mesh.isMesh) continue;
-      const layer = getLayerById(mesh.userData.layerId);
+  const applyVisibilityAndOpacity = (modelGroup) => {
+    for (const entity of getEntities(modelGroup)) {
+      const layer = getLayerById(entity.layerId);
       if (!layer) {
-        mesh.visible = true;
-        setMeshOpacity?.(mesh, mesh.userData.baseOpacity ?? 1);
-        continue;
+        entity.layerVisible = true;
+        entity.layerOpacity = 1;
+      } else {
+        entity.layerVisible = layer.visible;
+        entity.layerOpacity = layer.opacity;
       }
-      mesh.visible = layer.visible;
-      const opacity = (mesh.userData.baseOpacity ?? 1) * layer.opacity;
-      setMeshOpacity?.(mesh, opacity);
+      syncEntityAppearance(entity);
     }
+    refreshBatchTransparency(modelGroup);
   };
 
   const collectBindingOptions = (modelGroup) => {
     const files = new Set();
     const entities = new Set();
-    for (const mesh of modelGroup.children) {
-      if (!mesh.isMesh) continue;
-      if (mesh.userData.sourceFile) files.add(mesh.userData.sourceFile);
-      if (mesh.userData.typeName) entities.add(mesh.userData.typeName);
+    for (const entity of getEntities(modelGroup)) {
+      if (entity.sourceFile) files.add(entity.sourceFile);
+      if (entity.typeName) entities.add(entity.typeName);
     }
     return {
       files: [...files].sort(),
