@@ -20,10 +20,24 @@ const emit = (entity) => {
   return expressId;
 };
 
+/** Deterministic PRNG (mulberry32) — stable GlobalId across regenerations. */
+const mulberry32 = (seed) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+const rand = mulberry32(0x0ff1ce01);
+
 const guid = () => {
+  // IFC compressed GUID: first char encodes 2 bits → must be in 0–3.
   const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
-  let out = "";
-  for (let i = 0; i < 22; i += 1) out += alphabet[(Math.random() * alphabet.length) | 0];
+  let out = alphabet[(rand() * 4) | 0];
+  for (let i = 1; i < 22; i += 1) out += alphabet[(rand() * alphabet.length) | 0];
   return out;
 };
 
@@ -107,6 +121,19 @@ const styleSolid = (solidId, name, rgb) => {
   emit(`IFCSTYLEDITEM(#${solidId},(#${style}),$)`);
 };
 
+const attachAreaQuantities = (productId, qtoName, quantities) => {
+  const refs = [];
+  for (const [qName, value] of Object.entries(quantities || {})) {
+    if (!(value > 0)) continue;
+    refs.push(emit(`IFCQUANTITYAREA('${esc(qName)}','${esc(qName)}',$,${value},$)`));
+  }
+  if (!refs.length) return;
+  const eq = emit(
+    `IFCELEMENTQUANTITY('${guid()}',#${ownerHistory},'${esc(qtoName)}',$,$,(${refs.map((id) => `#${id}`).join(",")}))`
+  );
+  emit(`IFCRELDEFINESBYPROPERTIES('${guid()}',#${ownerHistory},$,$,(#${productId}),#${eq})`);
+};
+
 const createBox = ({
   typeName,
   name,
@@ -116,16 +143,52 @@ const createBox = ({
   size,
   depth,
   color,
-  tag
+  tag,
+  predefinedType = null,
+  globalId = null,
+  areaQuantities = null,
+  qtoName = "Qto_BaseQuantities",
+  axis = [0, 0, 1],
+  ref = [1, 0, 0]
 }) => {
-  const placement = localPlacement(parentPlacement, origin);
+  const placement = localPlacement(parentPlacement, origin, axis, ref);
   const profile = rectangleProfile(name, size[0], size[1]);
   const solid = extrudedSolid(profile, depth);
   styleSolid(solid, name, color);
   const shape = productShape(shapeRep(solid));
-  return emit(
-    `${typeName}('${guid()}',#${ownerHistory},'${esc(name)}','${esc(description)}',$,#${placement},#${shape},'${esc(tag)}')`
+  const typeSuffix = predefinedType ? `,.${predefinedType}.` : "";
+  const product = emit(
+    `${typeName}('${globalId || guid()}',#${ownerHistory},'${esc(name)}','${esc(description)}',$,#${placement},#${shape},'${esc(tag)}'${typeSuffix})`
   );
+  if (areaQuantities) attachAreaQuantities(product, qtoName, areaQuantities);
+  return product;
+};
+
+const createSpace = ({
+  name,
+  longName,
+  parentPlacement,
+  origin,
+  size,
+  depth,
+  netArea,
+  grossArea
+}) => {
+  const placement = localPlacement(parentPlacement, origin);
+  const profile = rectangleProfile(name, size[0], size[1]);
+  const solid = extrudedSolid(profile, depth);
+  styleSolid(solid, name, [0.55, 0.75, 0.95]);
+  const shape = productShape(shapeRep(solid));
+  const space = emit(
+    `IFCSPACE('${guid()}',#${ownerHistory},'${esc(name)}','Pomieszczenie',$,#${placement},#${shape},'${esc(
+      longName
+    )}',.ELEMENT.,.INTERNAL.,$)`
+  );
+  attachAreaQuantities(space, "Qto_SpaceBaseQuantities", {
+    NetFloorArea: netArea,
+    GrossFloorArea: grossArea
+  });
+  return space;
 };
 
 const relAggregates = (relating, related, name) =>
@@ -159,18 +222,21 @@ const addStoreyShell = (bucket, placement, levelTag) => {
       size: [W, D],
       depth: 0.28,
       color: [0.55, 0.55, 0.55],
-      tag: `S-SLAB-${levelTag}`
+      tag: `S-SLAB-${levelTag}`,
+      predefinedType: "FLOOR",
+      qtoName: "Qto_SlabBaseQuantities",
+      areaQuantities: { NetArea: W * D, GrossArea: W * D }
     })
   );
 
+  // W without Qto (along plan Y → mesh-area path); diagonal without Qto on P0 only.
   const walls = [
-    { name: `Sciana_S_${levelTag}`, origin: [0, -WALL / 2, 0.28], size: [W, WALL] },
-    { name: `Sciana_N_${levelTag}`, origin: [0, D - WALL / 2, 0.28], size: [W, WALL] },
-    { name: `Sciana_W_${levelTag}`, origin: [-WALL / 2, 0, 0.28], size: [WALL, D] },
-    { name: `Sciana_E_${levelTag}`, origin: [W - WALL / 2, 0, 0.28], size: [WALL, D] },
-    // Internal corridor walls
-    { name: `Sciana_kor_A_${levelTag}`, origin: [0, 4.85, 0.28], size: [7.5, 0.2] },
-    { name: `Sciana_kor_B_${levelTag}`, origin: [10.5, 4.85, 0.28], size: [7.5, 0.2] }
+    { name: `Sciana_S_${levelTag}`, origin: [0, -WALL / 2, 0.28], size: [W, WALL], netSide: W * H, withQto: true },
+    { name: `Sciana_N_${levelTag}`, origin: [0, D - WALL / 2, 0.28], size: [W, WALL], netSide: W * H, withQto: true },
+    { name: `Sciana_W_${levelTag}`, origin: [-WALL / 2, 0, 0.28], size: [WALL, D], netSide: D * H, withQto: false },
+    { name: `Sciana_E_${levelTag}`, origin: [W - WALL / 2, 0, 0.28], size: [WALL, D], netSide: D * H, withQto: true },
+    { name: `Sciana_kor_A_${levelTag}`, origin: [0, 4.85, 0.28], size: [7.5, 0.2], netSide: 7.5 * H, withQto: true },
+    { name: `Sciana_kor_B_${levelTag}`, origin: [10.5, 4.85, 0.28], size: [7.5, 0.2], netSide: 7.5 * H, withQto: true }
   ];
   for (const wall of walls) {
     bucket.push(
@@ -183,7 +249,36 @@ const addStoreyShell = (bucket, placement, levelTag) => {
         size: wall.size,
         depth: H,
         color: [0.84, 0.8, 0.72],
-        tag: wall.name
+        tag: wall.name,
+        predefinedType: "STANDARD",
+        ...(wall.withQto
+          ? {
+              qtoName: "Qto_WallBaseQuantities",
+              areaQuantities: {
+                NetSideArea: wall.netSide,
+                GrossSideArea: wall.netSide
+              }
+            }
+          : {})
+      })
+    );
+  }
+
+  if (levelTag === "P0") {
+    bucket.push(
+      createBox({
+        typeName: "IFCWALL",
+        name: "Sciana_ukosna_P0",
+        description: "Sciana ukosna bez Qto (test powierzchni z siatki)",
+        parentPlacement: placement,
+        origin: [6.0, 2.0, 0.28],
+        axis: [0, 0, 1],
+        ref: [Math.SQRT1_2, Math.SQRT1_2, 0],
+        size: [5.0, WALL],
+        depth: H,
+        color: [0.78, 0.74, 0.66],
+        tag: "Sciana_ukosna_P0",
+        predefinedType: "STANDARD"
       })
     );
   }
@@ -429,6 +524,20 @@ elements0.push(
     tag: "P-ERR-COL"
   })
 );
+// Fully inside middle column [8.75, 5.8] 0.4×0.4 — shorter than column thickness (containment)
+elements0.push(
+  createBox({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_Rura_wewnatrz_slupa",
+    description: "BLAD: krotka rura calkowicie wewnatrz slupa (bez przeciecia powierzchni)",
+    parentPlacement: storey0Placement,
+    origin: [8.85, 5.9, 1.5],
+    size: [0.15, 0.08],
+    depth: 0.08,
+    color: [0.05, 0.4, 0.95],
+    tag: "P-ERR-INSIDE"
+  })
+);
 elements0.push(
   createBox({
     typeName: "IFCSANITARYTERMINAL",
@@ -456,7 +565,7 @@ elements0.push(
   })
 );
 
-// Exact near-duplicate pipes for duplicate/clash testing
+// Exact near-duplicate pipes for geometric duplicate testing (centers ~5 cm apart)
 elements0.push(
   createBox({
     typeName: "IFCPIPESEGMENT",
@@ -481,6 +590,38 @@ elements0.push(
     depth: 2.0,
     color: [0.1, 0.5, 0.8],
     tag: "P-DUP-B"
+  })
+);
+
+// Identical GlobalId pair (WF-09) — far apart so only GlobalId detection fires.
+// Same GUID as test-building.ifc → „Oba sample naraz” → 1 grupa × 4 elementy (expected).
+const DUP_GLOBAL_ID = "0DupGidTestSample00001";
+elements0.push(
+  createBox({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_GlobalId_dup_A",
+    description: "BLAD: powtorzony GlobalId A",
+    parentPlacement: storey0Placement,
+    origin: [2.0, 9.0, 0.5],
+    size: [0.1, 0.1],
+    depth: 1.2,
+    color: [0.85, 0.2, 0.2],
+    tag: "P-GID-A",
+    globalId: DUP_GLOBAL_ID
+  })
+);
+elements0.push(
+  createBox({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_GlobalId_dup_B",
+    description: "BLAD: powtorzony GlobalId B (ten sam GUID)",
+    parentPlacement: storey0Placement,
+    origin: [16.0, 1.0, 0.5],
+    size: [0.1, 0.1],
+    depth: 1.2,
+    color: [0.85, 0.2, 0.2],
+    tag: "P-GID-B",
+    globalId: DUP_GLOBAL_ID
   })
 );
 
@@ -596,9 +737,61 @@ elements1.push(
   })
 );
 
+// Spaces (aggregated into storey — not ContainedInSpatialStructure)
+const spaces0 = [
+  createSpace({
+    name: "Biuro_P0_A",
+    longName: "Biuro open-space Parter A",
+    parentPlacement: storey0Placement,
+    origin: [1.0, 0.5, 0.28],
+    size: [7.0, 4.0],
+    depth: 2.9,
+    netArea: 28.0,
+    grossArea: 30.0
+  }),
+  createSpace({
+    name: "Korytarz_P0",
+    longName: "Korytarz parter",
+    parentPlacement: storey0Placement,
+    origin: [1.0, 5.2, 0.28],
+    size: [16.0, 1.5],
+    depth: 2.9,
+    netArea: 24.0,
+    grossArea: 25.5
+  })
+];
+const spaces1 = [
+  createSpace({
+    name: "Sala_P1",
+    longName: "Sala konferencyjna Piętro 1",
+    parentPlacement: storey1Placement,
+    origin: [2.0, 1.0, 0.28],
+    size: [8.0, 5.0],
+    depth: 2.9,
+    netArea: 40.0,
+    grossArea: 42.0
+  })
+];
+
+// Space without Qto — should appear as skipped in the report
+{
+  const placement = localPlacement(storey1Placement, [12.0, 1.0, 0.28]);
+  const profile = rectangleProfile("Magazyn_P1_bez_Qto", 3.0, 2.5);
+  const solid = extrudedSolid(profile, 2.9);
+  styleSolid(solid, "Magazyn_P1_bez_Qto", [0.7, 0.75, 0.8]);
+  const shape = productShape(shapeRep(solid));
+  spaces1.push(
+    emit(
+      `IFCSPACE('${guid()}',#${ownerHistory},'Magazyn_P1_bez_Qto','Pomieszczenie bez quantities',$,#${placement},#${shape},'Magazyn bez Qto',.ELEMENT.,.INTERNAL.,$)`
+    )
+  );
+}
+
 relAggregates(project, [site], "ProjectContainer");
 relAggregates(site, [building], "SiteContainer");
 relAggregates(building, [storey0, storey1], "BuildingStoreys");
+relAggregates(storey0, spaces0, "ParterSpaces");
+relAggregates(storey1, spaces1, "Pietro1Spaces");
 relContained(storey0, elements0, "ParterElements");
 relContained(storey1, elements1, "Pietro1Elements");
 

@@ -58,12 +58,14 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
     const discipline = pairMeta.discipline ?? entity?.discipline ?? "brak";
     const objectType = entity?.objectType ?? "brak";
     const name = entity?.name ?? "brak";
+    const globalId = entity?.globalId ?? "brak";
     const sourceFile = entity?.sourceFile ?? "brak";
     const material = pairMeta.material ?? entity?.materialLabel ?? "…";
     return [
       `${label}:`,
       `Plik: ${sourceFile}`,
       `ExpressID: ${expressId}`,
+      `GlobalId: ${globalId}`,
       `GeometryID: ${geometryId}`,
       `web-ifc typeId: ${typeId}`,
       `Entity: ${typeName}`,
@@ -145,10 +147,31 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
     );
   };
 
+  const highlightDuplicateGroup = async (group) => {
+    const entities = [...new Set((group?.entities || []).filter(Boolean))];
+    const kindLabel = group?.kind === "globalId" ? "Duplikat GlobalId" : "Duplikat geometryczny";
+    const itemLines = (group?.items || []).map((item, index) => {
+      const entity = item.entity;
+      return `${index + 1}. ${entity?.name ?? "?"} | ExpressID ${entity?.expressID ?? "?"} | GlobalId ${entity?.globalId ?? "brak"} | ${entity?.sourceFile ?? "?"}`;
+    });
+
+    selectMeshes(entities, {
+      colorHex: 0xef4444,
+      intensity: 0.95,
+      infoText: [
+        `${kindLabel}: ${group?.label ?? ""}`,
+        `Elementy w grupie: ${group?.items?.length ?? entities.length}`,
+        "",
+        ...itemLines
+      ].join("\n")
+    });
+  };
+
   return {
     clearSelection,
     selectMesh,
     selectMeshes,
-    highlightCollisionPair
+    highlightCollisionPair,
+    highlightDuplicateGroup
   };
 };

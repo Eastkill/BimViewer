@@ -141,7 +141,7 @@ export const extractQuantitiesFromPsets = (psets = []) => {
   let areaName = null;
 
   for (const pset of psets) {
-    const props = pset?.HasProperties || pset?.Properties || [];
+    const props = pset?.HasProperties || pset?.Quantities || pset?.Properties || [];
     if (!Array.isArray(props)) continue;
 
     for (const prop of props) {

@@ -3,7 +3,7 @@ import * as THREE from "three";
 const DB_NAME = "bimviewer-ifc-cache";
 const DB_VERSION = 1;
 const STORE_NAME = "processedFiles";
-export const IFC_CACHE_SCHEMA_VERSION = 1;
+export const IFC_CACHE_SCHEMA_VERSION = 2;
 const MAX_ENTRIES = 12;
 
 const openDb = () =>
@@ -154,6 +154,7 @@ export const serializePlacements = (placements) =>
     typeName: placement.typeName,
     objectType: placement.objectType,
     name: placement.name,
+    globalId: placement.globalId ?? null,
     discipline: placement.discipline
   }));
 
@@ -197,6 +198,7 @@ export const rebuildPlacementsFromCache = (cachedPlacements, fileName, modelId) 
     typeName: item.typeName,
     objectType: item.objectType,
     name: item.name,
+    globalId: item.globalId ?? null,
     discipline: item.discipline,
     sourceFile: fileName,
     modelId

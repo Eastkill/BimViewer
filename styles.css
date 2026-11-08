@@ -262,6 +262,22 @@ h1 {
   gap: 8px;
 }
 
+.tolerance-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.tolerance-field input {
+  width: 100%;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+}
+
 .isolation-toggle {
   display: flex;
   align-items: center;

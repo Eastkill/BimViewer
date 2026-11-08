@@ -1,5 +1,6 @@
 import { DEFAULT_OUTPUT } from "./constants.js";
 import { formatVolume } from "./material-takeoff.js";
+import { formatArea } from "./spatial-areas.js";
 
 export const createUI = () => {
   const fileInput = document.getElementById("ifcFile");
@@ -13,9 +14,14 @@ export const createUI = () => {
   const fileAlignControls = document.getElementById("fileAlignControls");
   const collisionLayerA = document.getElementById("collisionLayerA");
   const collisionLayerB = document.getElementById("collisionLayerB");
+  const collisionTolerance = document.getElementById("collisionTolerance");
   const detectCollisionsButton = document.getElementById("detectCollisionsButton");
   const collisionIsolationToggle = document.getElementById("collisionIsolationToggle");
   const collisionOutput = document.getElementById("collisionOutput");
+  const detectDuplicatesButton = document.getElementById("detectDuplicatesButton");
+  const duplicateOutput = document.getElementById("duplicateOutput");
+  const duplicatePositionTolerance = document.getElementById("duplicatePositionTolerance");
+  const duplicateSizeTolerance = document.getElementById("duplicateSizeTolerance");
   const tabViewerButton = document.getElementById("tabViewerButton");
   const tabReportButton = document.getElementById("tabReportButton");
   const viewerTabPanel = document.getElementById("viewerTabPanel");
@@ -48,7 +54,11 @@ export const createUI = () => {
     loadRealisticSampleButton.disabled = isLoading;
     if (loadBothSamplesButton) loadBothSamplesButton.disabled = isLoading;
     detectCollisionsButton.disabled = isLoading;
+    if (detectDuplicatesButton) detectDuplicatesButton.disabled = isLoading;
     collisionIsolationToggle.disabled = isLoading;
+    if (collisionTolerance) collisionTolerance.disabled = isLoading;
+    if (duplicatePositionTolerance) duplicatePositionTolerance.disabled = isLoading;
+    if (duplicateSizeTolerance) duplicateSizeTolerance.disabled = isLoading;
     if (refreshReportButton) refreshReportButton.disabled = isLoading;
     if (isLoading) {
       writeOutput("Wczytywanie IFC i budowanie sceny WebGPU...");
@@ -91,11 +101,121 @@ export const createUI = () => {
   tabReportButton?.addEventListener("click", () => setActiveTab("report"));
   refreshReportButton?.addEventListener("click", () => onRefreshReportHandler?.());
 
+  const appendSpatialSections = (container, spatial) => {
+    if (!spatial) return;
+
+    const floorSection = document.createElement("div");
+    floorSection.className = "material-report-header";
+    const skippedSpaces =
+      spatial.meta?.spacesSkippedNoQto > 0
+        ? `<br/>${spatial.meta.spacesSkippedNoQto} pomieszczeń bez Qto — nieuwzględnione (łącznie IfcSpace: ${spatial.meta.spacesTotal ?? "?"} ).`
+        : "";
+    const unitNote = spatial.meta?.areaUnitNote ? `<br/>${spatial.meta.areaUnitNote}` : "";
+    const slabNote = spatial.meta?.slabFilterNote
+      ? `<br/>${spatial.meta.slabFilterNote}${
+          spatial.meta.slabsExcluded
+            ? ` (wykluczono: ${spatial.meta.slabsExcluded})`
+            : ""
+        }`
+      : "";
+    floorSection.innerHTML = `
+      <h2>Powierzchnia kondygnacji (WF-13)</h2>
+      <p class="material-report-meta">
+        Kondygnacje: ${spatial.storeyCount ?? 0} |
+        Σ IfcSpace netto: <strong>${formatArea(spatial.totals?.spaceNetArea)} m²</strong> |
+        Σ IfcSpace brutto: <strong>${formatArea(spatial.totals?.spaceGrossArea)} m²</strong> |
+        Σ IfcSlab (FLOOR): <strong>${formatArea(spatial.totals?.slabArea)} m²</strong>
+        ${[skippedSpaces, unitNote, slabNote].filter(Boolean).join("")}
+      </p>
+    `;
+    container.append(floorSection);
+
+    const floorWrap = document.createElement("div");
+    floorWrap.className = "material-report-table-wrap";
+    const floorTable = document.createElement("table");
+    floorTable.className = "material-report-table";
+    floorTable.innerHTML = `
+      <thead>
+        <tr>
+          <th>Kondygnacja</th>
+          <th>Elev. [m]</th>
+          <th>Space netto [m²]</th>
+          <th>Space brutto [m²]</th>
+          <th>Slab [m²]</th>
+          <th>Space / Slab</th>
+        </tr>
+      </thead>
+    `;
+    const floorBody = document.createElement("tbody");
+    for (const row of spatial.storeyRows || []) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.storeyName}</td>
+        <td class="num">${row.elevation == null ? "—" : Number(row.elevation).toFixed(2)}</td>
+        <td class="num">${formatArea(row.spaceNetArea)}</td>
+        <td class="num">${formatArea(row.spaceGrossArea)}</td>
+        <td class="num">${formatArea(row.slabArea)}</td>
+        <td class="num">${row.spaceCount} / ${row.slabCount}</td>
+      `;
+      floorBody.append(tr);
+    }
+    floorTable.append(floorBody);
+    floorWrap.append(floorTable);
+    container.append(floorWrap);
+
+    const wallSection = document.createElement("div");
+    wallSection.className = "material-report-header";
+    wallSection.innerHTML = `
+      <h2>Powierzchnia użytkowa ścian (WF-14)</h2>
+      <p class="material-report-meta">
+        Σ netto: <strong>${formatArea(spatial.totals?.wallNetArea)} m²</strong> |
+        Σ brutto: <strong>${formatArea(spatial.totals?.wallGrossArea)} m²</strong>
+        <br/>Bez Qto otworów netto ≈ brutto (jedna strona z siatki / NetSideArea — nie ×2).
+      </p>
+    `;
+    container.append(wallSection);
+
+    const wallWrap = document.createElement("div");
+    wallWrap.className = "material-report-table-wrap";
+    const wallTable = document.createElement("table");
+    wallTable.className = "material-report-table";
+    wallTable.innerHTML = `
+      <thead>
+        <tr>
+          <th>Kondygnacja</th>
+          <th>Ściany</th>
+          <th>Netto [m²]</th>
+          <th>Brutto [m²]</th>
+        </tr>
+      </thead>
+    `;
+    const wallBody = document.createElement("tbody");
+    for (const row of spatial.storeyRows || []) {
+      if (!(row.wallCount > 0 || row.wallNetArea > 0 || row.wallGrossArea > 0)) continue;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.storeyName}</td>
+        <td class="num">${row.wallCount}</td>
+        <td class="num">${formatArea(row.wallNetArea)}</td>
+        <td class="num">${formatArea(row.wallGrossArea)}</td>
+      `;
+      wallBody.append(tr);
+    }
+    if (!wallBody.children.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="4">Brak ścian z policzalną powierzchnią.</td>`;
+      wallBody.append(tr);
+    }
+    wallTable.append(wallBody);
+    wallWrap.append(wallTable);
+    container.append(wallWrap);
+  };
+
   const renderMaterialReport = (report, { loading = false, error = null } = {}) => {
     if (!materialReport) return;
 
     if (loading) {
-      materialReport.innerHTML = `<p class="material-report-empty">Liczenie zużycia materiałów...</p>`;
+      materialReport.innerHTML = `<p class="material-report-empty">Liczenie zużycia materiałów i powierzchni...</p>`;
       return;
     }
 
@@ -106,7 +226,7 @@ export const createUI = () => {
 
     if (!report) {
       materialReport.innerHTML =
-        `<p class="material-report-empty">Wczytaj model IFC, aby wygenerować raport materiałów.</p>`;
+        `<p class="material-report-empty">Wczytaj model IFC, aby wygenerować raport materiałów i powierzchni.</p>`;
       return;
     }
 
@@ -125,53 +245,54 @@ export const createUI = () => {
       </p>
     `;
 
+    materialReport.innerHTML = "";
+    materialReport.append(header);
+
     if (!rows.length) {
-      materialReport.innerHTML = "";
-      materialReport.append(header);
       const empty = document.createElement("p");
       empty.className = "material-report-empty";
       empty.textContent =
-        "Brak policzalnych ilości. Model może nie mieć materiałów ani quantities — spróbuj pliku z IfcMaterial / Qto.";
+        "Brak policzalnych ilości materiałów. Model może nie mieć IfcMaterial / Qto — poniżej nadal widać powierzchnie.";
       materialReport.append(empty);
-      return;
-    }
-
-    const wrap = document.createElement("div");
-    wrap.className = "material-report-table-wrap";
-    const table = document.createElement("table");
-    table.className = "material-report-table";
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Materiał</th>
-          <th>Objętość [m³]</th>
-          <th>Udział</th>
-          <th>Elementy (wpisy)</th>
-          <th>Źródło / uwagi</th>
-        </tr>
-      </thead>
-    `;
-    const tbody = document.createElement("tbody");
-    const total = report.totalVolumeM3 || 0;
-
-    for (const row of rows) {
-      const tr = document.createElement("tr");
-      const share = total > 0 ? `${((row.volumeM3 / total) * 100).toFixed(1)}%` : "—";
-      const sourceText = [...(row.sources || []), ...(row.notes || [])].filter(Boolean).join(" · ") || "—";
-      tr.innerHTML = `
-        <td>${row.material}</td>
-        <td class="num">${formatVolume(row.volumeM3)}</td>
-        <td class="num">${share}</td>
-        <td class="num">${row.elementCount}</td>
-        <td>${sourceText}</td>
+    } else {
+      const wrap = document.createElement("div");
+      wrap.className = "material-report-table-wrap";
+      const table = document.createElement("table");
+      table.className = "material-report-table";
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Materiał</th>
+            <th>Objętość [m³]</th>
+            <th>Udział</th>
+            <th>Elementy (wpisy)</th>
+            <th>Źródło / uwagi</th>
+          </tr>
+        </thead>
       `;
-      tbody.append(tr);
+      const tbody = document.createElement("tbody");
+      const total = report.totalVolumeM3 || 0;
+
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        const share = total > 0 ? `${((row.volumeM3 / total) * 100).toFixed(1)}%` : "—";
+        const sourceText = [...(row.sources || []), ...(row.notes || [])].filter(Boolean).join(" · ") || "—";
+        tr.innerHTML = `
+          <td>${row.material}</td>
+          <td class="num">${formatVolume(row.volumeM3)}</td>
+          <td class="num">${share}</td>
+          <td class="num">${row.elementCount}</td>
+          <td>${sourceText}</td>
+        `;
+        tbody.append(tr);
+      }
+
+      table.append(tbody);
+      wrap.append(table);
+      materialReport.append(wrap);
     }
 
-    table.append(tbody);
-    wrap.append(table);
-    materialReport.innerHTML = "";
-    materialReport.append(header, wrap);
+    appendSpatialSections(materialReport, report.spatial);
   };
 
   const isCollisionIsolationEnabled = () => collisionIsolationToggle.checked;
@@ -193,13 +314,23 @@ export const createUI = () => {
 
     const summary = document.createElement("p");
     summary.className = "collision-summary";
+    const tol = result?.tolerance ?? 0;
+    const toleranceText =
+      tol > 0
+        ? `Tolerancja: +${tol} m (prześwit / soft clash)`
+        : tol < 0
+          ? `Tolerancja: ${tol} m (dopuszczalne przenikanie |t|=${Math.abs(tol)})`
+          : "Tolerancja: 0 m (stykanie AABB liczy się jako kolizja)";
 
     if (!result || result.collisionsCount === 0) {
       summary.textContent = [
         `Warstwa A: ${result?.layerA ?? "-"}`,
         `Warstwa B: ${result?.layerB ?? "-"}`,
+        toleranceText,
         `Sprawdzone obiekty: ${result?.testedA ?? 0} x ${result?.testedB ?? 0}`,
-        "Kolizje: 0"
+        `Kandydaci AABB: ${result?.aabbCandidates ?? 0}`,
+        `Odrzucone (brak przecięcia siatek): ${result?.meshRejected ?? 0}`,
+        "Kolizje (faza precyzyjna): 0"
       ].join("\n");
       collisionOutput.append(summary);
       return;
@@ -208,12 +339,21 @@ export const createUI = () => {
     summary.textContent = [
       `Warstwa A: ${result.layerA}`,
       `Warstwa B: ${result.layerB}`,
+      toleranceText,
       `Sprawdzone obiekty: ${result.testedA} x ${result.testedB}`,
-      `Kolizje: ${result.collisionsCount}`,
+      `Kandydaci AABB: ${result.aabbCandidates ?? result.collisionsCount}`,
+      `Odrzucone (brak przecięcia siatek): ${result.meshRejected ?? 0}`,
+      result.softClashCount
+        ? `Kolizje miękkie (prześwit): ${result.softClashCount}`
+        : null,
+      `Kolizje (lista pełna): ${result.collisionsCount}`,
+      "Faza 1: AABB → faza 2: trójkąt–trójkąt + containment (odsiewa poręcz w otworze; łapie rurę w słupie).",
       "Kliknij pare, aby podswietlic obiekty na czerwono.",
       "Podwojne klikniecie przenosi kamere do kolizji.",
       "Wlacz \"Tryb izolacji kolizji\", aby przygasic reszte modelu."
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     collisionOutput.append(summary);
 
     const list = document.createElement("ul");
@@ -225,23 +365,119 @@ export const createUI = () => {
       handler?.(pair);
     };
 
-    result.samplePairs.forEach((pair, index) => {
+    const COLLISION_PAGE = 200;
+    let visibleCount = Math.min(COLLISION_PAGE, result.samplePairs.length);
+
+    const appendPairItems = (from, to) => {
+      for (let index = from; index < to; index += 1) {
+        const pair = result.samplePairs[index];
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "collision-item";
+        button.title = "Kliknij: podswietl. Podwojne klikniecie: przenies kamere.";
+        const kindTag = pair.kind === "soft" ? " [prześwit]" : "";
+        button.textContent = `${index + 1}. ${pair.leftExpressId} (${pair.leftDiscipline}) <-> ${pair.rightExpressId} (${pair.rightDiscipline})${kindTag}`;
+        button.addEventListener("click", () => activatePair(button, pair, onPairClick));
+        button.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          activatePair(button, pair, onPairDoubleClick ?? onPairClick);
+        });
+        item.append(button);
+        list.append(item);
+      }
+    };
+
+    appendPairItems(0, visibleCount);
+    collisionOutput.append(list);
+
+    if (result.samplePairs.length > COLLISION_PAGE) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "collision-item";
+      const refreshMoreLabel = () => {
+        const remaining = result.samplePairs.length - visibleCount;
+        more.textContent =
+          remaining > 0
+            ? `Pokaż kolejne ${Math.min(COLLISION_PAGE, remaining)} (widoczne ${visibleCount}/${result.samplePairs.length})`
+            : "";
+        more.hidden = remaining <= 0;
+      };
+      refreshMoreLabel();
+      more.addEventListener("click", () => {
+        const next = Math.min(visibleCount + COLLISION_PAGE, result.samplePairs.length);
+        appendPairItems(visibleCount, next);
+        visibleCount = next;
+        refreshMoreLabel();
+      });
+      collisionOutput.append(more);
+    }
+  };
+
+  const setDuplicateOutput = (text) => {
+    if (!duplicateOutput) return;
+    duplicateOutput.textContent = text;
+  };
+
+  const renderDuplicateResults = (result, onGroupClick, onGroupDoubleClick) => {
+    if (!duplicateOutput) return;
+    duplicateOutput.innerHTML = "";
+
+    const summary = document.createElement("p");
+    summary.className = "collision-summary";
+
+    if (!result || result.totalGroups === 0) {
+      summary.textContent = [
+        `Elementy: ${result?.elementCount ?? 0}`,
+        `Tolerancja pozycji/rozmiaru: ${result?.positionTolerance ?? "-"} / ${result?.sizeTolerance ?? "-"} m`,
+        "Grup duplikatów: 0",
+        "Brak powtórzonych GlobalId ani podobnej geometrii."
+      ].join("\n");
+      duplicateOutput.append(summary);
+      return;
+    }
+
+    summary.textContent = [
+      `Elementy: ${result.elementCount}`,
+      `GlobalId × grup: ${result.globalIdDuplicateGroups}`,
+      `Geometria × grup: ${result.geometricDuplicateGroups}`,
+      `Razem (lista max ${result.groups.length}): ${result.totalGroups}`,
+      "Kliknij grupę, aby podświetlić. Podwójne kliknięcie przenosi kamerę."
+    ].join("\n");
+    duplicateOutput.append(summary);
+
+    const list = document.createElement("ul");
+    list.className = "collision-list";
+
+    const activateGroup = (button, group, handler) => {
+      list.querySelectorAll(".collision-item.active").forEach((node) => node.classList.remove("active"));
+      button.classList.add("active");
+      handler?.(group);
+    };
+
+    result.groups.forEach((group, index) => {
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
       button.className = "collision-item";
-      button.title = "Kliknij: podswietl. Podwojne klikniecie: przenies kamere.";
-      button.textContent = `${index + 1}. ${pair.leftExpressId} (${pair.leftDiscipline}) <-> ${pair.rightExpressId} (${pair.rightDiscipline})`;
-      button.addEventListener("click", () => activatePair(button, pair, onPairClick));
+      button.title = "Kliknij: podświetl. Podwójne kliknięcie: przenieś kamerę.";
+      const kind = group.kind === "globalId" ? "GlobalId" : "Geometria";
+      const names = (group.items || [])
+        .map((entry) => entry.entity?.name || entry.entity?.expressID)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(" / ");
+      button.textContent = `${index + 1}. [${kind}] ${group.label}${names ? ` — ${names}` : ""}`;
+      button.addEventListener("click", () => activateGroup(button, group, onGroupClick));
       button.addEventListener("dblclick", (event) => {
         event.preventDefault();
-        activatePair(button, pair, onPairDoubleClick ?? onPairClick);
+        activateGroup(button, group, onGroupDoubleClick ?? onGroupClick);
       });
       item.append(button);
       list.append(item);
     });
 
-    collisionOutput.append(list);
+    duplicateOutput.append(list);
   };
 
   const renderLayerControls = (layers, countsById, bindingOptions, handlers = {}) => {
@@ -528,6 +764,20 @@ export const createUI = () => {
     layerB: collisionLayerB.value
   });
 
+  const getCollisionTolerance = () => {
+    const value = Number(collisionTolerance?.value);
+    return Number.isFinite(value) ? value : 0;
+  };
+
+  const getDuplicateTolerances = () => {
+    const position = Number(duplicatePositionTolerance?.value);
+    const size = Number(duplicateSizeTolerance?.value);
+    return {
+      positionTolerance: Number.isFinite(position) && position >= 0 ? position : 0.1,
+      sizeTolerance: Number.isFinite(size) && size >= 0 ? size : 0.05
+    };
+  };
+
   showModelInfo();
 
   return {
@@ -545,9 +795,14 @@ export const createUI = () => {
     renderFileAlignControls,
     setCollisionLayerOptions,
     getSelectedCollisionLayers,
+    getCollisionTolerance,
+    getDuplicateTolerances,
     detectCollisionsButton,
+    detectDuplicatesButton,
     setCollisionOutput,
     renderCollisionResults,
+    setDuplicateOutput,
+    renderDuplicateResults,
     isCollisionIsolationEnabled,
     setCollisionIsolationEnabled,
     onCollisionIsolationChange,

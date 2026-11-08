@@ -13,11 +13,13 @@ import {
 } from "./ifc-cache.js";
 import { buildMaterialTakeoffReport } from "./material-takeoff.js";
 import { formatMaterialsLabel } from "./materials.js";
+import { buildSpatialAreaReport } from "./spatial-areas.js";
 
 export const createIfcService = () => {
   let ifcApi = null;
   let initialized = false;
   let openModelIds = [];
+  const quantityPsetCache = new Map();
 
   const init = async () => {
     if (initialized) return;
@@ -52,6 +54,7 @@ export const createIfcService = () => {
       }
     }
     openModelIds = [];
+    quantityPsetCache.clear();
   };
 
   // Backwards-compatible alias used by main.js
@@ -199,6 +202,7 @@ export const createIfcService = () => {
           typeName: placement.typeName,
           objectType: placement.objectType,
           name: placement.name,
+          globalId: placement.globalId ?? null,
           discipline: placement.discipline,
           sourceFile: placement.sourceFile,
           modelId: placement.modelId,
@@ -298,6 +302,7 @@ export const createIfcService = () => {
           typeName: elementTypeName,
           objectType: elementLine?.ObjectType?.value ?? elementLine?.ObjectType ?? null,
           name: elementLine?.Name?.value ?? elementLine?.Name ?? null,
+          globalId: elementLine?.GlobalId?.value ?? elementLine?.GlobalId ?? null,
           discipline,
           sourceFile: file.name,
           modelId
@@ -353,15 +358,17 @@ export const createIfcService = () => {
 
     const modelId = openIfcModel(data, file.name);
     const projectName = readProjectName(modelId);
+    const startIndex = allPlacements.length;
     const meshCount = parseFilePlacements(file, modelId, aggregates, allPlacements, geometryCache);
+    const fileOnlyPlacements = allPlacements.slice(startIndex);
 
     // Fire-and-forget persist; load should not wait on IndexedDB write.
     void setCachedProcessedFile({
       key: cacheKey,
       fileName: file.name,
       projectName,
-      placements: serializePlacements(allPlacements),
-      geometries: serializeGeometries(geometryCache, allPlacements)
+      placements: serializePlacements(fileOnlyPlacements),
+      geometries: serializeGeometries(geometryCache, fileOnlyPlacements)
     });
 
     return {
@@ -454,9 +461,10 @@ export const createIfcService = () => {
       `Draw calle (BatchedMesh): ${allBatches.length}`,
       `Grupy plikow (do wyrównania): ${fileGroups.length}`,
       `Unikalne geometrie: ${aggregates.geometryCounts.size}`,
-      `Duplikaty geometrii (ID): ${duplicateReport.duplicateGeometryCount}`,
-      `Instancje geometrii (powtorzenia): ${duplicateReport.duplicateGeometryInstances}`,
-      `Duplikaty elementow (ExpressID/plik): ${duplicateReport.duplicateElementsCount}`,
+      `Wspoldzielone geometrie (instancjonowanie): ${duplicateReport.duplicateGeometryCount}`,
+      `Instancje wspoldzielonej geometrii: ${duplicateReport.duplicateGeometryInstances}`,
+      `Powtorzone ExpressID w pliku: ${duplicateReport.duplicateElementsCount}`,
+      "Uwaga: realne duplikaty (GlobalId / podobna geometria) sprawdzaj w panelu Duplikaty.",
       ...Object.entries(aggregates.disciplineCounts).map(([name, count]) => `${name}: ${count}`)
     ].join("\n");
 
@@ -490,6 +498,9 @@ export const createIfcService = () => {
 
   const getElementQuantityPsets = async (modelId, expressID) => {
     if (!initialized || !ifcApi || modelId == null || expressID == null) return [];
+    const cacheKey = `${modelId}:${expressID}`;
+    if (quantityPsetCache.has(cacheKey)) return quantityPsetCache.get(cacheKey);
+
     try {
       const fromElement = await ifcApi.properties.getPropertySets(modelId, expressID, true, false);
       let fromType = [];
@@ -498,8 +509,11 @@ export const createIfcService = () => {
       } catch {
         fromType = [];
       }
-      return [...(fromElement || []), ...(fromType || [])];
+      const merged = [...(fromElement || []), ...(fromType || [])];
+      quantityPsetCache.set(cacheKey, merged);
+      return merged;
     } catch {
+      quantityPsetCache.set(cacheKey, []);
       return [];
     }
   };
@@ -515,6 +529,18 @@ export const createIfcService = () => {
     });
   };
 
+  const buildProjectSpatialAreas = async (entities) => {
+    if (!initialized || !ifcApi) {
+      throw new Error("web-ifc nie zostalo zainicjalizowane.");
+    }
+    return buildSpatialAreaReport({
+      ifcApi,
+      openModelIds: [...openModelIds],
+      entities,
+      getQuantityPsets: getElementQuantityPsets
+    });
+  };
+
   return {
     init,
     closeCurrentModel,
@@ -522,6 +548,9 @@ export const createIfcService = () => {
     loadIntoGroup,
     loadFilesIntoGroup,
     getElementMaterialsLabel,
-    buildProjectMaterialTakeoff
+    getElementQuantityPsets,
+    buildProjectMaterialTakeoff,
+    buildProjectSpatialAreas,
+    getOpenModelIds: () => [...openModelIds]
   };
 };

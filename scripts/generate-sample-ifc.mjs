@@ -2,12 +2,13 @@
  * Generates a small multi-discipline IFC4 sample building for BimViewer tests.
  * Includes structure, architecture, electrical, water/sewage, HVAC and intentional collisions.
  */
-import { writeFileSync } from "node:fs";
+import { copyFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outPath = join(__dirname, "..", "samples", "test-building.ifc");
+const publicPath = join(__dirname, "..", "public", "samples", "test-building.ifc");
 
 let nextId = 1;
 const lines = [];
@@ -144,15 +145,41 @@ const relContained = (storeyId, elements, name) =>
       .join(",")}),#${storeyId})`
   );
 
+/** Deterministic PRNG (mulberry32) — stable GlobalId across regenerations. */
+const mulberry32 = (seed) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+const rand = mulberry32(0x7e57b001);
+
 function guid() {
-  // IFC compressed GUID-like tokens (22 chars); uniqueness is enough for sample.
+  // IFC compressed GUID: first char encodes 2 bits → must be in 0–3.
   const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
-  let out = "";
-  for (let i = 0; i < 22; i += 1) {
-    out += alphabet[(Math.random() * alphabet.length) | 0];
+  let out = alphabet[(rand() * 4) | 0];
+  for (let i = 1; i < 22; i += 1) {
+    out += alphabet[(rand() * alphabet.length) | 0];
   }
   return out;
 }
+
+const attachAreaQuantities = (productId, qtoName, quantities) => {
+  const refs = [];
+  for (const [qName, value] of Object.entries(quantities || {})) {
+    if (!(value > 0)) continue;
+    refs.push(emit(`IFCQUANTITYAREA('${esc(qName)}','${esc(qName)}',$,${value},$)`));
+  }
+  if (!refs.length) return;
+  const eq = emit(
+    `IFCELEMENTQUANTITY('${guid()}',#${ownerHistory},'${esc(qtoName)}',$,$,(${refs.map((id) => `#${id}`).join(",")}))`
+  );
+  emit(`IFCRELDEFINESBYPROPERTIES('${guid()}',#${ownerHistory},$,$,(#${productId}),#${eq})`);
+};
 
 const createExtrudedProduct = ({
   typeName,
@@ -165,7 +192,11 @@ const createExtrudedProduct = ({
   profileSize,
   depth,
   color,
-  tag = null
+  tag = null,
+  predefinedType = null,
+  globalId = null,
+  areaQuantities = null,
+  qtoName = "Qto_BaseQuantities"
 }) => {
   const placement = localPlacement(placementParent, origin, axis, ref);
   const profile = rectangleProfile(name, profileSize[0], profileSize[1]);
@@ -174,10 +205,39 @@ const createExtrudedProduct = ({
   const rep = shapeRep(solid);
   const shape = productShape(rep);
   const tagPart = tag == null ? "$" : `'${esc(tag)}'`;
+  const typeSuffix = predefinedType ? `,.${predefinedType}.` : "";
   const product = emit(
-    `${typeName}('${guid()}',#${ownerHistory},'${esc(name)}','${esc(description)}',$,#${placement},#${shape},${tagPart})`
+    `${typeName}('${globalId || guid()}',#${ownerHistory},'${esc(name)}','${esc(description)}',$,#${placement},#${shape},${tagPart}${typeSuffix})`
   );
+  if (areaQuantities) attachAreaQuantities(product, qtoName, areaQuantities);
   return product;
+};
+
+const createSpace = ({
+  name,
+  longName,
+  placementParent,
+  origin,
+  profileSize,
+  depth,
+  netArea,
+  grossArea
+}) => {
+  const placement = localPlacement(placementParent, origin);
+  const profile = rectangleProfile(name, profileSize[0], profileSize[1]);
+  const solid = extrudedSolid(profile, depth);
+  styleSolid(solid, name, [0.55, 0.75, 0.95]);
+  const shape = productShape(shapeRep(solid));
+  const space = emit(
+    `IFCSPACE('${guid()}',#${ownerHistory},'${esc(name)}','Pomieszczenie',$,#${placement},#${shape},'${esc(
+      longName
+    )}',.ELEMENT.,.INTERNAL.,$)`
+  );
+  attachAreaQuantities(space, "Qto_SpaceBaseQuantities", {
+    NetFloorArea: netArea,
+    GrossFloorArea: grossArea
+  });
+  return space;
 };
 
 const elements = [];
@@ -193,7 +253,10 @@ elements.push(
     profileSize: [10, 8],
     depth: 0.3,
     color: [0.55, 0.55, 0.55],
-    tag: "S-SLAB-01"
+    tag: "S-SLAB-01",
+    predefinedType: "FLOOR",
+    qtoName: "Qto_SlabBaseQuantities",
+    areaQuantities: { NetArea: 80, GrossArea: 80 }
   })
 );
 
@@ -212,14 +275,16 @@ elements.push(
   })
 );
 
-// Walls: south, north, west, east
+// Walls: S/N/E with Qto; W without Qto (runs along Y/Z plan → mesh-area path);
+// diagonal without Qto for mesh-area regression.
 const wallDefs = [
-  { name: "Sciana_S", origin: [0, -0.15, 0.3], size: [10, 0.3], depth: 3 },
-  { name: "Sciana_N", origin: [0, 7.85, 0.3], size: [10, 0.3], depth: 3 },
-  { name: "Sciana_W", origin: [-0.15, 0, 0.3], size: [0.3, 8], depth: 3 },
-  { name: "Sciana_E", origin: [9.85, 0, 0.3], size: [0.3, 8], depth: 3 }
+  { name: "Sciana_S", origin: [0, -0.15, 0.3], size: [10, 0.3], depth: 3, withQto: true },
+  { name: "Sciana_N", origin: [0, 7.85, 0.3], size: [10, 0.3], depth: 3, withQto: true },
+  { name: "Sciana_W", origin: [-0.15, 0, 0.3], size: [0.3, 8], depth: 3, withQto: false },
+  { name: "Sciana_E", origin: [9.85, 0, 0.3], size: [0.3, 8], depth: 3, withQto: true }
 ];
 for (const wall of wallDefs) {
+  const netSide = Math.max(wall.size[0], wall.size[1]) * wall.depth;
   elements.push(
     createExtrudedProduct({
       typeName: "IFCWALL",
@@ -230,10 +295,34 @@ for (const wall of wallDefs) {
       profileSize: wall.size,
       depth: wall.depth,
       color: [0.82, 0.78, 0.7],
-      tag: wall.name
+      tag: wall.name,
+      predefinedType: "STANDARD",
+      ...(wall.withQto
+        ? {
+            qtoName: "Qto_WallBaseQuantities",
+            areaQuantities: { NetSideArea: netSide, GrossSideArea: netSide }
+          }
+        : {})
     })
   );
 }
+
+elements.push(
+  createExtrudedProduct({
+    typeName: "IFCWALL",
+    name: "Sciana_ukosna",
+    description: "Sciana ukosna bez Qto (test powierzchni z siatki)",
+    placementParent: storeyPlacement,
+    origin: [3.5, 2.5, 0.3],
+    axis: [0, 0, 1],
+    ref: [Math.SQRT1_2, Math.SQRT1_2, 0],
+    profileSize: [4, 0.3],
+    depth: 3,
+    color: [0.78, 0.74, 0.66],
+    tag: "Sciana_ukosna",
+    predefinedType: "STANDARD"
+  })
+);
 
 // Columns
 const columns = [
@@ -504,7 +593,7 @@ elements.push(
   })
 );
 
-// Near-duplicate geometry pair for duplicate detection (same size boxes, separate products)
+// Near-duplicate pair: centers ~5 cm apart (detected by center distance, not abutting AABB)
 elements.push(
   createExtrudedProduct({
     typeName: "IFCPIPESEGMENT",
@@ -522,9 +611,9 @@ elements.push(
   createExtrudedProduct({
     typeName: "IFCPIPESEGMENT",
     name: "Rura_duplikat_B",
-    description: "Segment B do testu duplikatow (identyczna geometria lokalna)",
+    description: "Segment B do testu duplikatow (srodki ~5 cm od siebie)",
     placementParent: storeyPlacement,
-    origin: [3.4, 6.0, 0.5],
+    origin: [3.05, 6.02, 0.5],
     profileSize: [0.1, 0.1],
     depth: 1.0,
     color: [0.1, 0.5, 0.8],
@@ -532,9 +621,70 @@ elements.push(
   })
 );
 
+// Identical GlobalId pair (WF-09). Same GUID also used in office-building sample:
+// loading both files → one GlobalId group with 4 elements (expected).
+const DUP_GLOBAL_ID = "0DupGidTestSample00001";
+elements.push(
+  createExtrudedProduct({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_GlobalId_dup_A",
+    description: "Powtorzony GlobalId A",
+    placementParent: storeyPlacement,
+    origin: [1.0, 6.5, 0.5],
+    profileSize: [0.08, 0.08],
+    depth: 0.8,
+    color: [0.85, 0.2, 0.2],
+    tag: "P-GID-A",
+    globalId: DUP_GLOBAL_ID
+  })
+);
+elements.push(
+  createExtrudedProduct({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_GlobalId_dup_B",
+    description: "Powtorzony GlobalId B",
+    placementParent: storeyPlacement,
+    origin: [8.0, 1.0, 0.5],
+    profileSize: [0.08, 0.08],
+    depth: 0.8,
+    color: [0.85, 0.2, 0.2],
+    tag: "P-GID-B",
+    globalId: DUP_GLOBAL_ID
+  })
+);
+
+// Fully contained pipe inside Slup_5 (0.4×0.4 at [4.8,4]) — no surface intersection
+elements.push(
+  createExtrudedProduct({
+    typeName: "IFCPIPESEGMENT",
+    name: "ERROR_Rura_wewnatrz_slupa",
+    description: "BLAD: krotka rura calkowicie wewnatrz slupa (containment)",
+    placementParent: storeyPlacement,
+    origin: [4.9, 4.1, 1.4],
+    profileSize: [0.12, 0.08],
+    depth: 0.08,
+    color: [0.05, 0.4, 0.95],
+    tag: "P-ERR-INSIDE"
+  })
+);
+
+const spaces = [
+  createSpace({
+    name: "Biuro_01",
+    longName: "Biuro testowe",
+    placementParent: storeyPlacement,
+    origin: [1.0, 1.0, 0.3],
+    profileSize: [4.0, 3.0],
+    depth: 2.8,
+    netArea: 12.0,
+    grossArea: 13.0
+  })
+];
+
 relAggregates(project, [site], "ProjectContainer");
 relAggregates(site, [building], "SiteContainer");
 relAggregates(building, [storey], "BuildingContainer");
+relAggregates(storey, spaces, "StoreySpaces");
 relContained(storey, elements, "StoreyElements");
 
 const content = [
@@ -551,5 +701,7 @@ const content = [
 ].join("\n");
 
 writeFileSync(outPath, content, "utf8");
+copyFileSync(outPath, publicPath);
 console.log(`Generated ${outPath}`);
-console.log(`Entities: ${lines.length}, products: ${elements.length}`);
+console.log(`Copied to ${publicPath}`);
+console.log(`Entities: ${lines.length}, products: ${elements.length}, spaces: ${spaces.length}`);

@@ -1,4 +1,5 @@
 import { detectLayerCollisions } from "./src/collisions.js";
+import { detectDuplicates } from "./src/duplicates.js";
 import { getEntities, syncEntityAppearance } from "./src/entities.js";
 import {
   applyFileTransform,
@@ -31,6 +32,7 @@ const ISOLATION_DIM = 0.22;
 let pointerDownPos = null;
 let lastCollisionResult = null;
 let activeCollisionPair = null;
+let lastDuplicateResult = null;
 let lastDisciplineCounts = {};
 let selectedAlignFileName = null;
 let fileAlignGizmoEnabled = false;
@@ -248,7 +250,11 @@ const refreshMaterialReport = async () => {
   reportLoading = true;
   ui.renderMaterialReport(null, { loading: true });
   try {
-    lastMaterialReport = await ifcService.buildProjectMaterialTakeoff(entities);
+    const [materials, spatial] = await Promise.all([
+      ifcService.buildProjectMaterialTakeoff(entities),
+      ifcService.buildProjectSpatialAreas(entities)
+    ]);
+    lastMaterialReport = { ...materials, spatial };
     ui.renderMaterialReport(lastMaterialReport);
   } catch (error) {
     console.error(error);
@@ -282,6 +288,7 @@ const resetModelGroup = () => {
   lastDisciplineCounts = {};
   lastCollisionResult = null;
   activeCollisionPair = null;
+  lastDuplicateResult = null;
   selectedAlignFileName = null;
   fileAlignGizmoEnabled = false;
   fileAlignMode = "translate";
@@ -289,6 +296,7 @@ const resetModelGroup = () => {
   ui.setCollisionIsolationEnabled(false);
   viewer.replaceModelGroup(new THREE.Group());
   refreshFileAlignUi();
+  ui.setDuplicateOutput("Brak analizy duplikatów.");
   ui.renderMaterialReport(null);
 };
 
@@ -305,6 +313,16 @@ const focusCollisionPair = (pair) => {
 const flyToCollisionPair = (pair) => {
   focusCollisionPair(pair);
   viewer.fitCameraToEntities([pair.leftMesh, pair.rightMesh].filter(Boolean));
+};
+
+const focusDuplicateGroup = (group) => {
+  void selection.highlightDuplicateGroup(group);
+  viewer.requestRender();
+};
+
+const flyToDuplicateGroup = (group) => {
+  focusDuplicateGroup(group);
+  viewer.fitCameraToEntities(group?.entities || []);
 };
 
 const loadIfcFiles = async (files) => {
@@ -333,6 +351,8 @@ const loadIfcFiles = async (files) => {
     refreshFileAlignUi();
     ui.setCollisionLayerOptions(layerManager.getLayerNames());
     ui.setCollisionOutput("Brak analizy kolizji.");
+    ui.setDuplicateOutput("Brak analizy duplikatów.");
+    lastDuplicateResult = null;
     ui.setBaseModelInfo(
       restoredCount > 0
         ? `${summary}\n\nPrzywrocono zapisane wyrównanie dla ${restoredCount} plik(ow).`
@@ -484,9 +504,24 @@ ui.detectCollisionsButton.addEventListener("click", () => {
 
   selection.clearSelection();
   activeCollisionPair = null;
-  lastCollisionResult = detectLayerCollisions(modelGroup, layerA, layerB);
+  lastCollisionResult = detectLayerCollisions(modelGroup, layerA, layerB, {
+    tolerance: ui.getCollisionTolerance()
+  });
   ui.renderCollisionResults(lastCollisionResult, focusCollisionPair, flyToCollisionPair);
   applyCollisionIsolationView();
+});
+
+ui.detectDuplicatesButton?.addEventListener("click", () => {
+  const modelGroup = viewer.getModelGroup();
+  if (!getEntities(modelGroup).length) {
+    ui.setDuplicateOutput("Najpierw wczytaj model IFC.");
+    return;
+  }
+
+  selection.clearSelection();
+  lastDuplicateResult = detectDuplicates(modelGroup, ui.getDuplicateTolerances());
+  ui.renderDuplicateResults(lastDuplicateResult, focusDuplicateGroup, flyToDuplicateGroup);
+  viewer.requestRender();
 });
 
 const boot = async () => {
