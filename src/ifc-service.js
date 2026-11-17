@@ -24,23 +24,18 @@ export const createIfcService = () => {
   const init = async () => {
     if (initialized) return;
     const { IfcAPI } = await import("web-ifc");
-    ifcApi = new IfcAPI();
 
-    const localWasmPath = `${import.meta.env.BASE_URL}wasm/`;
+    // WASM is served from the app's own static files (public/wasm) — no external hosts,
+    // so the viewer also works offline / inside closed networks.
+    const api = new IfcAPI();
     try {
-      await ifcApi.SetWasmPath(localWasmPath, true);
-      await ifcApi.Init();
-    } catch (localError) {
-      await ifcApi.SetWasmPath("https://unpkg.com/web-ifc@0.0.77/", true);
-      try {
-        await ifcApi.Init();
-      } catch (cdnError) {
-        throw new Error(
-          `Nie udalo sie zainicjalizowac web-ifc WASM. Lokalnie: ${localError?.message ?? localError}. CDN: ${cdnError?.message ?? cdnError}`
-        );
-      }
+      await api.SetWasmPath(`${import.meta.env.BASE_URL}wasm/`, true);
+      await api.Init();
+    } catch (error) {
+      throw new Error(`Nie udało się zainicjalizować web-ifc (WASM): ${error?.message ?? error}`);
     }
 
+    ifcApi = api;
     initialized = true;
   };
 
@@ -57,9 +52,6 @@ export const createIfcService = () => {
     quantityPsetCache.clear();
   };
 
-  // Backwards-compatible alias used by main.js
-  const closeCurrentModel = () => closeAllModels();
-
   const extractBufferGeometry = (modelId, geometryId, geometryCache) => {
     const cacheKey = `${modelId}:${geometryId}`;
     if (geometryCache.has(cacheKey)) {
@@ -72,31 +64,31 @@ export const createIfcService = () => {
       return null;
     }
 
-    const vertexData = Float32Array.from(
-      ifcApi.GetVertexArray(ifcGeometry.GetVertexData(), ifcGeometry.GetVertexDataSize())
-    );
-    const indexData = Uint32Array.from(
-      ifcApi.GetIndexArray(ifcGeometry.GetIndexData(), ifcGeometry.GetIndexDataSize())
-    );
-    ifcGeometry.delete();
+    // Both arrays are views into the WASM heap: de-interleave / copy them out
+    // before the geometry is released (no intermediate full copy of the vertex data).
+    const vertexData = ifcApi.GetVertexArray(ifcGeometry.GetVertexData(), ifcGeometry.GetVertexDataSize());
+    const indexView = ifcApi.GetIndexArray(ifcGeometry.GetIndexData(), ifcGeometry.GetIndexDataSize());
 
-    if (!vertexData.length || !indexData.length) {
+    if (!vertexData.length || !indexView.length) {
+      ifcGeometry.delete();
       geometryCache.set(cacheKey, null);
       return null;
     }
 
-    const positionArray = new Float32Array((vertexData.length / 6) * 3);
-    const normalArray = new Float32Array((vertexData.length / 6) * 3);
-    let write = 0;
-    for (let i = 0; i < vertexData.length; i += 6) {
-      positionArray[write] = vertexData[i];
-      positionArray[write + 1] = vertexData[i + 1];
-      positionArray[write + 2] = vertexData[i + 2];
-      normalArray[write] = vertexData[i + 3];
-      normalArray[write + 1] = vertexData[i + 4];
-      normalArray[write + 2] = vertexData[i + 5];
-      write += 3;
+    // web-ifc vertex layout: x, y, z, nx, ny, nz
+    const vertexCount = Math.floor(vertexData.length / 6);
+    const positionArray = new Float32Array(vertexCount * 3);
+    const normalArray = new Float32Array(vertexCount * 3);
+    for (let read = 0, write = 0; write < vertexCount * 3; read += 6, write += 3) {
+      positionArray[write] = vertexData[read];
+      positionArray[write + 1] = vertexData[read + 1];
+      positionArray[write + 2] = vertexData[read + 2];
+      normalArray[write] = vertexData[read + 3];
+      normalArray[write + 1] = vertexData[read + 4];
+      normalArray[write + 2] = vertexData[read + 5];
     }
+    const indexData = Uint32Array.from(indexView);
+    ifcGeometry.delete();
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positionArray, 3));
@@ -233,9 +225,15 @@ export const createIfcService = () => {
   };
 
   const openIfcModel = (data, fileName) => {
-    const modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
+    let modelId = -1;
+    try {
+      modelId = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
+    } catch {
+      // web-ifc throws an internal TypeError when the STEP header cannot be read.
+      throw new Error(`Plik „${fileName}” nie jest poprawnym plikiem IFC (STEP) lub jest uszkodzony.`);
+    }
     if (modelId < 0) {
-      throw new Error(`OpenModel blad dla pliku: ${fileName}`);
+      throw new Error(`Nie udało się otworzyć modelu z pliku: ${fileName}`);
     }
     openModelIds.push(modelId);
     return modelId;
@@ -264,9 +262,11 @@ export const createIfcService = () => {
       const elementTypeId = ifcApi.GetLineType(modelId, elementId);
       const elementTypeName = ifcApi.GetNameFromTypeCode(elementTypeId) || "UNKNOWN";
 
+      // Only scalar attributes (Name, GlobalId, ObjectType…) are needed here, so skip
+      // flattening: resolving every referenced entity is ~25× slower per element.
       let elementLine = null;
       try {
-        elementLine = ifcApi.GetLine(modelId, elementId, true);
+        elementLine = ifcApi.GetLine(modelId, elementId, false);
       } catch {
         elementLine = null;
       }
@@ -383,12 +383,12 @@ export const createIfcService = () => {
 
   const loadFilesIntoGroup = async (files, targetGroup) => {
     if (!initialized || !ifcApi) {
-      throw new Error("web-ifc nie zostalo zainicjalizowane. Sprobuj odswiezyc strone.");
+      throw new Error("Biblioteka web-ifc nie została zainicjalizowana. Spróbuj odświeżyć stronę.");
     }
 
     const fileList = Array.from(files || []).filter(Boolean);
     if (fileList.length === 0) {
-      throw new Error("Nie wybrano zadnych plikow IFC.");
+      throw new Error("Nie wybrano żadnych plików IFC.");
     }
 
     closeAllModels();
@@ -439,7 +439,7 @@ export const createIfcService = () => {
     }
 
     if (allEntities.length === 0) {
-      throw new Error("Pliki IFC zostaly otwarte, ale nie zawieraja geometrii 3D do wyrenderowania.");
+      throw new Error("Pliki IFC zostały otwarte, ale nie zawierają geometrii 3D do wyrenderowania.");
     }
 
     targetGroup.userData.entities = allEntities;
@@ -459,11 +459,11 @@ export const createIfcService = () => {
       `Cache geometrii: ${cacheHits} hit / ${cacheMisses} miss`,
       `Elementy 3D (suma): ${allEntities.length}`,
       `Draw calle (BatchedMesh): ${allBatches.length}`,
-      `Grupy plikow (do wyrównania): ${fileGroups.length}`,
+      `Grupy plików (do wyrównania): ${fileGroups.length}`,
       `Unikalne geometrie: ${aggregates.geometryCounts.size}`,
-      `Wspoldzielone geometrie (instancjonowanie): ${duplicateReport.duplicateGeometryCount}`,
-      `Instancje wspoldzielonej geometrii: ${duplicateReport.duplicateGeometryInstances}`,
-      `Powtorzone ExpressID w pliku: ${duplicateReport.duplicateElementsCount}`,
+      `Współdzielone geometrie (instancjonowanie): ${duplicateReport.duplicateGeometryCount}`,
+      `Instancje współdzielonej geometrii: ${duplicateReport.duplicateGeometryInstances}`,
+      `Powtórzone ExpressID w pliku: ${duplicateReport.duplicateElementsCount}`,
       "Uwaga: realne duplikaty (GlobalId / podobna geometria) sprawdzaj w panelu Duplikaty.",
       ...Object.entries(aggregates.disciplineCounts).map(([name, count]) => `${name}: ${count}`)
     ].join("\n");
@@ -476,9 +476,6 @@ export const createIfcService = () => {
       cacheStats: { hits: cacheHits, misses: cacheMisses }
     };
   };
-
-  // Single-file helper kept for compatibility.
-  const loadIntoGroup = async (file, targetGroup) => loadFilesIntoGroup([file], targetGroup);
 
   const getElementMaterialNodes = async (modelId, expressID) => {
     if (!initialized || !ifcApi || modelId == null || expressID == null) return [];
@@ -520,7 +517,7 @@ export const createIfcService = () => {
 
   const buildProjectMaterialTakeoff = async (entities) => {
     if (!initialized || !ifcApi) {
-      throw new Error("web-ifc nie zostalo zainicjalizowane.");
+      throw new Error("Biblioteka web-ifc nie została zainicjalizowana.");
     }
     return buildMaterialTakeoffReport({
       entities,
@@ -531,7 +528,7 @@ export const createIfcService = () => {
 
   const buildProjectSpatialAreas = async (entities) => {
     if (!initialized || !ifcApi) {
-      throw new Error("web-ifc nie zostalo zainicjalizowane.");
+      throw new Error("Biblioteka web-ifc nie została zainicjalizowana.");
     }
     return buildSpatialAreaReport({
       ifcApi,
@@ -543,14 +540,10 @@ export const createIfcService = () => {
 
   return {
     init,
-    closeCurrentModel,
     closeAllModels,
-    loadIntoGroup,
     loadFilesIntoGroup,
     getElementMaterialsLabel,
-    getElementQuantityPsets,
     buildProjectMaterialTakeoff,
-    buildProjectSpatialAreas,
-    getOpenModelIds: () => [...openModelIds]
+    buildProjectSpatialAreas
   };
 };

@@ -1,14 +1,14 @@
 /**
- * Generates a small multi-discipline IFC4 sample building for BimViewer tests.
+ * Generates a small multi-discipline IFC4 test building for BimViewer tests.
  * Includes structure, architecture, electrical, water/sewage, HVAC and intentional collisions.
+ * Output: test-models/test-building.ifc (dev-only, not part of the production build).
  */
-import { copyFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = join(__dirname, "..", "samples", "test-building.ifc");
-const publicPath = join(__dirname, "..", "public", "samples", "test-building.ifc");
+const outPath = join(__dirname, "..", "test-models", "test-building.ifc");
 
 let nextId = 1;
 const lines = [];
@@ -41,8 +41,10 @@ const localPlacement = (relativeTo, origin, axis = [0, 0, 1], ref = [1, 0, 0]) =
   return emit(`IFCLOCALPLACEMENT(#${relativeTo},#${placement3d})`);
 };
 
+// IfcRectangleProfileDef is centred on its position, while every `origin` in this script is
+// the min-XY corner of the element — so the profile is shifted by half of its size.
 const rectangleProfile = (name, xDim, yDim) => {
-  const origin2d = emit("IFCCARTESIANPOINT((0.,0.))");
+  const origin2d = emit(`IFCCARTESIANPOINT((${xDim / 2},${yDim / 2}))`);
   const dir2d = emit("IFCDIRECTION((1.,0.))");
   const placement2d = emit(`IFCAXIS2PLACEMENT2D(#${origin2d},#${dir2d})`);
   return emit(`IFCRECTANGLEPROFILEDEF(.AREA.,'${esc(name)}',#${placement2d},${xDim},${yDim})`);
@@ -700,8 +702,7 @@ const content = [
   "END-ISO-10303-21;"
 ].join("\n");
 
+mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, content, "utf8");
-copyFileSync(outPath, publicPath);
 console.log(`Generated ${outPath}`);
-console.log(`Copied to ${publicPath}`);
 console.log(`Entities: ${lines.length}, products: ${elements.length}, spaces: ${spaces.length}`);

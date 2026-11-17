@@ -2,10 +2,27 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { WebGPURenderer } from "three/webgpu";
-import { disposeBatchedModelGroup, getEntityFromPick, getEntityWorldBox } from "./entities.js";
+import {
+  disposeBatchedModelGroup,
+  extractEntityWorldPositions,
+  getEntityFromPick,
+  getEntityWorldBox
+} from "./entities.js";
 import { readTransformFromGroup } from "./file-alignment.js";
 
-export const createViewer = (canvas) => {
+const PROBLEM_OVERLAY_MAX_ENTITIES = 24;
+const PROBLEM_OVERLAY_MAX_TRIANGLES = 400_000;
+const PROBLEM_OVERLAY_EDGE_TRIANGLES = 20_000;
+const PROBLEM_REGION_COLOR = 0xfacc15;
+/** Smallest box edge [m] the camera frames when flying to a problem. */
+const PROBLEM_MIN_VIEW_SIZE = 1.5;
+
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {{ forceWebGL?: boolean }} [options] forceWebGL skips WebGPU and uses the
+ *   WebGL 2 backend directly (used to compare both backends on the same machine).
+ */
+export const createViewer = (canvas, { forceWebGL = false } = {}) => {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b1220);
 
@@ -21,7 +38,7 @@ export const createViewer = (canvas) => {
   const renderer = new WebGPURenderer({
     canvas,
     antialias: true,
-    forceWebGL: false
+    forceWebGL
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
@@ -39,6 +56,21 @@ export const createViewer = (canvas) => {
   let modelGroup = new THREE.Group();
   scene.add(modelGroup);
 
+  // Overlay with the elements of the currently inspected collision / duplicate group.
+  const problemOverlay = new THREE.Group();
+  scene.add(problemOverlay);
+
+  const clearProblemOverlay = () => {
+    if (!problemOverlay.children.length) return;
+    for (const child of problemOverlay.children) {
+      child.geometry?.dispose?.();
+      child.material?.dispose?.();
+      child.dispose?.();
+    }
+    problemOverlay.clear();
+    needsRender = true;
+  };
+
   const transformControls = new TransformControls(camera, canvas);
   transformControls.setSize(0.9);
   const transformHelper = transformControls.getHelper();
@@ -48,6 +80,9 @@ export const createViewer = (canvas) => {
   const pointer = new THREE.Vector2();
   let ready = false;
   let needsRender = true;
+  // Frames actually drawn and the CPU time spent submitting them (on-demand rendering
+  // means this stays flat while the camera is idle).
+  const renderStats = { frames: 0, cpuMs: 0 };
   let activeFileEntry = null;
   let onFileTransformChange = null;
 
@@ -90,6 +125,8 @@ export const createViewer = (canvas) => {
 
   controls.addEventListener("change", requestRender);
   transformControls.addEventListener("change", () => {
+    // The overlay is built in world coordinates, so it goes stale once a file moves.
+    if (transformControls.dragging) clearProblemOverlay();
     if (activeFileEntry) {
       activeFileEntry.transform = readTransformFromGroup(activeFileEntry);
     }
@@ -125,9 +162,24 @@ export const createViewer = (canvas) => {
     if (!ready) return;
     const controlsMoved = controls.update();
     if (!needsRender && !controlsMoved) return;
+    const t0 = performance.now();
     renderer.render(scene, camera);
+    renderStats.cpuMs += performance.now() - t0;
+    renderStats.frames += 1;
     needsRender = controlsMoved;
   };
+
+  /** "WebGPU" or "WebGL 2" — known only after start(). */
+  const getBackendName = () => {
+    if (!ready) return "nieznany";
+    return renderer.backend?.isWebGPUBackend ? "WebGPU" : "WebGL 2";
+  };
+
+  const getRenderStats = () => ({
+    ...renderStats,
+    drawCalls: renderer.info?.render?.drawCalls ?? null,
+    triangles: renderer.info?.render?.triangles ?? null
+  });
 
   const start = async () => {
     await renderer.init();
@@ -146,6 +198,7 @@ export const createViewer = (canvas) => {
 
   const replaceModelGroup = (newGroup) => {
     clearFileTransformGizmo();
+    clearProblemOverlay();
     scene.remove(modelGroup);
     disposeBatchedModelGroup(modelGroup);
     modelGroup = newGroup;
@@ -212,6 +265,85 @@ export const createViewer = (canvas) => {
     }
     if (!hasBounds) return;
     fitCameraToBounds(bounds);
+  };
+
+  /**
+   * Draws the given entities and the problem region on top of the model (no depth
+   * test), so a clash stays visible even when it is buried inside a large building.
+   * @param {{ entity: object, color: number }[]} items
+   * @param {THREE.Box3 | null} region
+   */
+  const showProblemOverlay = (items = [], region = null) => {
+    clearProblemOverlay();
+
+    let triangleBudget = PROBLEM_OVERLAY_MAX_TRIANGLES;
+    for (const { entity, color } of items.slice(0, PROBLEM_OVERLAY_MAX_ENTITIES)) {
+      const positions = extractEntityWorldPositions(entity);
+      if (!positions) continue;
+      const triangles = positions.length / 9;
+      if (triangles > triangleBudget) continue;
+      triangleBudget -= triangles;
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+      const fill = new THREE.Mesh(
+        geometry,
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.45,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false
+        })
+      );
+      fill.renderOrder = 1000;
+      problemOverlay.add(fill);
+
+      // Outline only moderately sized meshes: EdgesGeometry is O(n) but allocates a lot.
+      if (triangles <= PROBLEM_OVERLAY_EDGE_TRIANGLES) {
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geometry, 30),
+          new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true })
+        );
+        edges.renderOrder = 1001;
+        problemOverlay.add(edges);
+      }
+    }
+
+    if (region && !region.isEmpty()) {
+      // Keep the frame visible when the region is flat or tiny (touching faces, thin overlap).
+      const frame = region.clone();
+      const size = frame.getSize(new THREE.Vector3());
+      const minSize = Math.max(0.05, Math.max(size.x, size.y, size.z) * 0.05);
+      frame.expandByVector(
+        new THREE.Vector3(
+          Math.max(0, minSize - size.x) / 2,
+          Math.max(0, minSize - size.y) / 2,
+          Math.max(0, minSize - size.z) / 2
+        )
+      );
+      const helper = new THREE.Box3Helper(frame, PROBLEM_REGION_COLOR);
+      helper.material.depthTest = false;
+      helper.material.depthWrite = false;
+      helper.material.transparent = true;
+      helper.renderOrder = 1002;
+      problemOverlay.add(helper);
+    }
+
+    requestRender();
+  };
+
+  /** Moves the camera so that the given box fills most of the view. */
+  const fitCameraToRegion = (region) => {
+    if (!region || region.isEmpty()) return;
+    const size = region.getSize(new THREE.Vector3());
+    // Small regions: keep enough surroundings in view to recognise the place.
+    const frame = region.clone();
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim < PROBLEM_MIN_VIEW_SIZE) frame.expandByScalar((PROBLEM_MIN_VIEW_SIZE - maxDim) / 2);
+    fitCameraToBounds(frame, 1.6);
   };
 
   const VIEW_PRESETS = {
@@ -328,10 +460,15 @@ export const createViewer = (canvas) => {
 
   return {
     start,
+    getBackendName,
+    getRenderStats,
     getModelGroup,
     replaceModelGroup,
     fitCameraToObject,
     fitCameraToEntities,
+    fitCameraToRegion,
+    showProblemOverlay,
+    clearProblemOverlay,
     setCameraView,
     getProjectionMode,
     setProjectionMode,

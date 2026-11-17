@@ -1,0 +1,312 @@
+{
+  "suite": "calculations",
+  "startedAt": "2026-11-17T15:24:29.034Z",
+  "finishedAt": "2026-11-17T15:24:29.091Z",
+  "environment": {
+    "backend": "WebGPU",
+    "forcedWebGL": false,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/3.30.14 Chrome/150.0.7871.250 Electron/43.8.9 Safari/537.36",
+    "hardwareConcurrency": 16,
+    "deviceMemoryGiB": 32,
+    "devicePixelRatio": 1,
+    "canvasCssSize": "1280×720",
+    "crossOriginIsolated": false,
+    "webgpuAdapter": {
+      "vendor": "nvidia",
+      "architecture": "turing",
+      "device": "",
+      "description": ""
+    },
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 2070 SUPER (0x00001E84) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "results": {
+    "disciplinesFromSystems": {
+      "expected": {
+        "Konstrukcja": 5,
+        "Stolarka": 1,
+        "Elektryka": 1,
+        "WodKan": 1,
+        "HVAC": 1,
+        "MEP": 1,
+        "Inne": 0
+      },
+      "measured": {
+        "Konstrukcja": 5,
+        "Stolarka": 1,
+        "Elektryka": 1,
+        "WodKan": 1,
+        "HVAC": 1,
+        "MEP": 1,
+        "Inne": 0
+      },
+      "perElement": []
+    },
+    "meshVolume": [
+      {
+        "name": "Plyta_Qto",
+        "expected": 12,
+        "measured": 12,
+        "errorPercent": 0
+      },
+      {
+        "name": "Segment_A",
+        "expected": 0.02,
+        "measured": 0.02,
+        "errorPercent": 0
+      },
+      {
+        "name": "Segment_B",
+        "expected": 0.02,
+        "measured": 0.02,
+        "errorPercent": 0
+      },
+      {
+        "name": "Segment_C",
+        "expected": 0.02,
+        "measured": 0.02,
+        "errorPercent": 0
+      },
+      {
+        "name": "Segment_D",
+        "expected": 0.02,
+        "measured": 0.02,
+        "errorPercent": 0
+      },
+      {
+        "name": "Slup_bez_Qto",
+        "expected": 0.48,
+        "measured": 0.48,
+        "errorPercent": 0
+      },
+      {
+        "name": "Sciana_warstwowa_Qto",
+        "expected": 7.2,
+        "measured": 7.2,
+        "errorPercent": 0
+      },
+      {
+        "name": "Sciana_warstwowa_bez_Qto",
+        "expected": 4.8,
+        "measured": 4.8,
+        "errorPercent": 0
+      },
+      {
+        "name": "Belka_zespolona",
+        "expected": 0.6,
+        "measured": 0.6,
+        "errorPercent": 0
+      },
+      {
+        "name": "Drzwi_bez_materialu",
+        "expected": 0.2,
+        "measured": 0.2,
+        "errorPercent": 0
+      }
+    ],
+    "materialTakeoff": {
+      "expectedTotal": 24.86,
+      "measuredTotal": 24.86,
+      "elementCount": 10,
+      "elementsWithMaterials": 5,
+      "elementsFromQto": 2,
+      "elementsFromGeometry": 8,
+      "rows": [
+        {
+          "material": "Cegla",
+          "expected": 7.5,
+          "measured": 7.5,
+          "errorPercent": 0,
+          "sources": [
+            "warstwa × powierzchnia IFC/estymacja"
+          ]
+        },
+        {
+          "material": "Welna mineralna",
+          "expected": 3.6,
+          "measured": 3.6,
+          "errorPercent": 0,
+          "sources": [
+            "warstwa × powierzchnia IFC/estymacja"
+          ]
+        },
+        {
+          "material": "Tynk",
+          "expected": 0.9,
+          "measured": 0.9,
+          "errorPercent": 0,
+          "sources": [
+            "warstwa × powierzchnia IFC/estymacja"
+          ]
+        },
+        {
+          "material": "Beton",
+          "expected": 12.28,
+          "measured": 12.28,
+          "errorPercent": 0,
+          "sources": [
+            "objętość elementu",
+            "objętość / liczba materiałów"
+          ]
+        },
+        {
+          "material": "Stal",
+          "expected": 0.3,
+          "measured": 0.3,
+          "errorPercent": 0,
+          "sources": [
+            "objętość / liczba materiałów"
+          ]
+        },
+        {
+          "material": "Brak / nieprzypisany",
+          "expected": 0.28,
+          "measured": 0.28,
+          "errorPercent": 0,
+          "sources": [
+            "geometria"
+          ]
+        }
+      ],
+      "unexpectedRows": []
+    },
+    "geometryVsOracle": {
+      "elements": 70,
+      "maxRelativeVolumeErrorPercent": 0,
+      "maxBoxSizeDeviationM": 0.000001
+    },
+    "wallAreaFromMesh": [
+      {
+        "name": "Sciana_S_P0",
+        "analyticSide": 57.6,
+        "measured": 58.56,
+        "errorPercent": 1.67,
+        "endFaceShare": 1.67
+      },
+      {
+        "name": "Sciana_N_P0",
+        "analyticSide": 57.6,
+        "measured": 58.56,
+        "errorPercent": 1.67,
+        "endFaceShare": 1.67
+      },
+      {
+        "name": "Sciana_W_P0",
+        "analyticSide": 38.4,
+        "measured": 39.36,
+        "errorPercent": 2.5,
+        "endFaceShare": 2.5
+      },
+      {
+        "name": "Sciana_E_P0",
+        "analyticSide": 38.4,
+        "measured": 39.36,
+        "errorPercent": 2.5,
+        "endFaceShare": 2.5
+      },
+      {
+        "name": "Sciana_kor_A_P0",
+        "analyticSide": 24,
+        "measured": 24.64,
+        "errorPercent": 2.67,
+        "endFaceShare": 2.67
+      },
+      {
+        "name": "Sciana_kor_B_P0",
+        "analyticSide": 24,
+        "measured": 24.64,
+        "errorPercent": 2.67,
+        "endFaceShare": 2.67
+      },
+      {
+        "name": "Sciana_ukosna_P0",
+        "analyticSide": 16,
+        "measured": 16.96,
+        "errorPercent": 6,
+        "endFaceShare": 100
+      },
+      {
+        "name": "Sciana_S_P1",
+        "analyticSide": 57.6,
+        "measured": 58.56,
+        "errorPercent": 1.67,
+        "endFaceShare": 1.67
+      },
+      {
+        "name": "Sciana_N_P1",
+        "analyticSide": 57.6,
+        "measured": 58.56,
+        "errorPercent": 1.67,
+        "endFaceShare": 1.67
+      },
+      {
+        "name": "Sciana_W_P1",
+        "analyticSide": 38.4,
+        "measured": 39.36,
+        "errorPercent": 2.5,
+        "endFaceShare": 2.5
+      },
+      {
+        "name": "Sciana_E_P1",
+        "analyticSide": 38.4,
+        "measured": 39.36,
+        "errorPercent": 2.5,
+        "endFaceShare": 2.5
+      },
+      {
+        "name": "Sciana_kor_A_P1",
+        "analyticSide": 24,
+        "measured": 24.64,
+        "errorPercent": 2.67,
+        "endFaceShare": 2.67
+      },
+      {
+        "name": "Sciana_kor_B_P1",
+        "analyticSide": 24,
+        "measured": 24.64,
+        "errorPercent": 2.67,
+        "endFaceShare": 2.67
+      }
+    ],
+    "spatialAreas": {
+      "storeyCount": 2,
+      "spacesTotal": 4,
+      "spacesSkippedNoQto": 1,
+      "slabsExcluded": 0,
+      "rows": [
+        {
+          "storey": "Parter",
+          "spaceNet": 52,
+          "spaceGross": 55.5,
+          "slab": 216,
+          "wallNet": 257.92,
+          "expected": {
+            "spaceNet": 52,
+            "spaceGross": 55.5,
+            "slab": 216,
+            "wallAnalytic": 256
+          },
+          "wallErrorPercent": 0.75
+        },
+        {
+          "storey": "Pietro 1",
+          "spaceNet": 40,
+          "spaceGross": 42,
+          "slab": 216,
+          "wallNet": 240.96,
+          "expected": {
+            "spaceNet": 40,
+            "spaceGross": 42,
+            "slab": 216,
+            "wallAnalytic": 240
+          },
+          "wallErrorPercent": 0.4
+        }
+      ]
+    },
+    "officeVolume": {
+      "totalVolumeM3": 505.502,
+      "elementCount": 70,
+      "elementsFromGeometry": 70
+    }
+  }
+}

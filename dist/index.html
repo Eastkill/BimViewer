@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BIM Viewer - IFC Reader</title>
-    <script type="module" crossorigin src="/assets/index-CPv0dNdR.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/three-core-ajTnzlBe.js">
-    <link rel="modulepreload" crossorigin href="/assets/three-extras-CM7_0bHu.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-Cvr8e89i.css">
+    <script type="module" crossorigin src="./assets/index-CEG-IOG_.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three-core-CpLHuz2b.js">
+    <link rel="modulepreload" crossorigin href="./assets/three-extras-Bt1kOzlz.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CD2Wa6s3.css">
   </head>
   <body>
     <main class="layout">
@@ -16,26 +16,23 @@
         <p class="subtitle">Wczytaj plik IFC i obejrzyj model 3D.</p>
 
         <section class="card">
-          <label for="ifcFile" class="file-label">Pliki IFC (mozna wiele)</label>
-          <input id="ifcFile" type="file" accept=".ifc,.ifcZIP,.ifczip" multiple />
-          <p class="file-hint">Ctrl/Cmd + klik, aby dodac kilka plikow branżowych (np. architektura + wodkan + HVAC).</p>
+          <label for="ifcFile" class="file-label">Pliki IFC (można wiele)</label>
+          <input id="ifcFile" type="file" accept=".ifc" multiple />
+          <p class="file-hint">Ctrl/Cmd + klik, aby dodać kilka plików branżowych (np. architektura + wod-kan + HVAC).</p>
           <div class="button-row">
             <button id="loadButton" type="button">Wczytaj IFC</button>
-            <button id="loadSampleButton" type="button" class="secondary">Sample prosty</button>
-            <button id="loadRealisticSampleButton" type="button" class="secondary">Sample biurowiec + bledy</button>
-            <button id="loadBothSamplesButton" type="button" class="secondary">Oba sample naraz</button>
           </div>
         </section>
 
         <div id="viewerSidebarPanels">
           <section class="card">
             <h2>Informacje</h2>
-            <pre id="output">Brak danych. Wybierz plik IFC i kliknij "Wczytaj IFC".</pre>
+            <pre id="output">Brak danych. Wybierz plik IFC i kliknij „Wczytaj IFC”.</pre>
           </section>
 
           <section class="card">
             <h2>Warstwy</h2>
-            <p class="file-hint">Domyslne = branze. Mozesz dodac custom warstwy powiazane z plikiem albo entity.</p>
+            <p class="file-hint">Warstwy domyślne odpowiadają branżom. Możesz dodać własne warstwy powiązane z plikiem albo typem encji.</p>
             <div id="layerControls" class="layer-controls"></div>
           </section>
 
@@ -48,18 +45,44 @@
           </section>
 
           <section class="card">
-            <h2>Kolizje miedzy warstwami</h2>
+            <h2>Kolizje między warstwami</h2>
             <div class="collision-controls">
               <select id="collisionLayerA"></select>
               <select id="collisionLayerB"></select>
+              <label class="tolerance-field" for="collisionTolerance">
+                <span>Tolerancja kolizji [m]</span>
+                <input id="collisionTolerance" type="number" step="0.01" value="0" />
+              </label>
               <button id="detectCollisionsButton" type="button">Wykryj kolizje</button>
               <label class="isolation-toggle">
                 <input id="collisionIsolationToggle" type="checkbox" />
                 <span>Tryb izolacji kolizji</span>
               </label>
-              <p class="isolation-hint">Niekolidujace = przyciemnione, kolidujace = pelne i czerwone.</p>
+              <p class="isolation-hint">
+                Niekolidujące = przyciemnione. Tolerancja &gt; 0: wymagany prześwit (miękka kolizja).
+                Tolerancja &lt; 0: dopuszczalne przenikanie — kolizja dopiero gdy nakładanie na każdej osi przekracza |t|.
+              </p>
             </div>
             <div id="collisionOutput" class="collision-output">Brak analizy kolizji.</div>
+          </section>
+
+          <section class="card">
+            <h2>Duplikaty</h2>
+            <p class="file-hint">
+              Wykrywa powtórzone GlobalId oraz elementy tego samego typu o podobnym rozmiarze AABB i bliskich środkach (bez stykania się „na styk”).
+            </p>
+            <div class="collision-controls">
+              <label class="tolerance-field" for="duplicatePositionTolerance">
+                <span>Tolerancja pozycji środków [m]</span>
+                <input id="duplicatePositionTolerance" type="number" min="0" step="0.01" value="0.1" />
+              </label>
+              <label class="tolerance-field" for="duplicateSizeTolerance">
+                <span>Tolerancja rozmiaru AABB [m]</span>
+                <input id="duplicateSizeTolerance" type="number" min="0" step="0.01" value="0.05" />
+              </label>
+              <button id="detectDuplicatesButton" type="button">Sprawdź duplikaty</button>
+            </div>
+            <div id="duplicateOutput" class="collision-output">Brak analizy duplikatów.</div>
           </section>
         </div>
 
@@ -86,20 +109,20 @@
 
         <div id="viewerTabPanel" class="tab-panel active" role="tabpanel">
           <div class="viewport">
-            <canvas id="viewerCanvas" aria-label="Podglad modelu IFC"></canvas>
+            <canvas id="viewerCanvas" aria-label="Podgląd modelu IFC"></canvas>
             <div class="view-gizmo" aria-label="Orientacja kamery">
               <button type="button" class="view-gizmo-btn" data-view="top" title="Widok z góry (Top)">Top</button>
               <button type="button" class="view-gizmo-btn" data-view="left" title="Widok z lewej (Left)">L</button>
               <button type="button" class="view-gizmo-btn" data-view="front" title="Widok z przodu (Front)">F</button>
               <button type="button" class="view-gizmo-btn" data-view="right" title="Widok z prawej (Right)">R</button>
-              <button type="button" class="view-gizmo-btn" data-view="back" title="Widok z tylu (Back)">B</button>
-              <button type="button" class="view-gizmo-btn" data-view="bottom" title="Widok z dolu (Bottom)">Bot</button>
+              <button type="button" class="view-gizmo-btn" data-view="back" title="Widok z tyłu (Back)">B</button>
+              <button type="button" class="view-gizmo-btn" data-view="bottom" title="Widok z dołu (Bottom)">Bot</button>
               <button type="button" class="view-gizmo-btn view-gizmo-iso" data-view="iso" title="Widok izometryczny">Iso</button>
               <button
                 type="button"
                 class="view-gizmo-btn view-gizmo-projection"
                 data-projection="toggle"
-                title="Przelacz projekcje: perspektywa / ortogonalna"
+                title="Przełącz rzut: perspektywiczny / ortogonalny"
               >
                 Persp
               </button>

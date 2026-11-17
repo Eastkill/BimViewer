@@ -1,24 +1,35 @@
 {
   "name": "bimviewer",
   "version": "1.0.0",
-  "description": "IFC viewer 3D oparty o WebGPU i web-ifc.",
+  "description": "Przeglądarkowa aplikacja do wizualizacji i walidacji modeli BIM (IFC) oparta o WebGPU i web-ifc.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate:sample-ifc": "node scripts/generate-sample-ifc.mjs",
-    "generate:realistic-sample-ifc": "node scripts/generate-realistic-sample-ifc.mjs",
-    "validate:sample-ifc": "node scripts/validate-sample-ifc.mjs"
+    "test": "vitest run",
+    "testdata:generate": "node scripts/generate-test-building.mjs && node scripts/generate-office-building.mjs && node scripts/generate-materials-model.mjs && node scripts/generate-scaling-models.mjs && node scripts/build-oracle.mjs",
+    "testdata:validate": "node scripts/validate-test-models.mjs"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "bim",
+    "ifc",
+    "webgpu",
+    "three.js",
+    "web-ifc"
+  ],
+  "author": "Witold Wojciechowski",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "three": "^0.185.1",
     "web-ifc": "^0.0.77"
   },
   "devDependencies": {
-    "vite": "^8.1.4"
+    "vite": "^8.1.4",
+    "vitest": "^5.1.0"
   }
 }

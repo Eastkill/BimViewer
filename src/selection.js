@@ -1,6 +1,7 @@
 import { syncEntityAppearance } from "./entities.js";
 
-const HIGHLIGHT_COLLISION = { r: 0.937, g: 0.267, b: 0.267 };
+export const HIGHLIGHT_SELECTION = { r: 0.133, g: 0.827, b: 0.933 }; // #22d3ee
+export const HIGHLIGHT_PROBLEM = { r: 0.937, g: 0.267, b: 0.267 }; // #ef4444
 
 const restoreEntityHighlight = (entity) => {
   entity.highlightColor = null;
@@ -24,22 +25,10 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
     selectedEntities = [];
   };
 
-  const selectMeshes = (entities, { colorHex = 0x22d3ee, intensity = 0.65, infoText = null } = {}) => {
+  const selectMeshes = (entities, { color = HIGHLIGHT_SELECTION, infoText = null } = {}) => {
     const unique = [...new Set(entities.filter(Boolean))];
     clearSelection();
     selectedEntities = unique;
-
-    const color =
-      colorHex === 0xef4444
-        ? HIGHLIGHT_COLLISION
-        : {
-            r: ((colorHex >> 16) & 255) / 255,
-            g: ((colorHex >> 8) & 255) / 255,
-            b: (colorHex & 255) / 255
-          };
-
-    // intensity kept for API compat; color is already tuned for batch tinting
-    void intensity;
 
     for (const entity of selectedEntities) {
       applyEntityHighlight(entity, color);
@@ -72,10 +61,15 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
       `Name: ${name}`,
       `ObjectType: ${objectType}`,
       `Material: ${material}`,
-      `Branza: ${discipline}`,
+      `Branża: ${discipline}`,
       `Warstwa: ${entity?.layerName ?? "brak"}`
     ].join("\n");
   };
+
+  const collisionHeader = (pairMeta) =>
+    ["Kolizja (A – czerwony, B – pomarańczowy, żółta ramka – miejsce kolizji):", pairMeta.locationText]
+      .filter(Boolean)
+      .join("\n");
 
   const enrichEntityMaterial = async (entity, token) => {
     if (!entity || !resolveMaterials) return entity?.materialLabel ?? "brak";
@@ -90,8 +84,6 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
   const selectMesh = async (entity) => {
     const token = selectionToken + 1;
     selectMeshes([entity], {
-      colorHex: 0x22d3ee,
-      intensity: 0.6,
       infoText: formatMeshInfo("Zaznaczenie", entity, { material: entity?.materialLabel ?? "…" })
     });
 
@@ -103,10 +95,9 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
   const highlightCollisionPair = async (leftEntity, rightEntity, pairMeta = {}) => {
     const token = selectionToken + 1;
     selectMeshes([leftEntity, rightEntity], {
-      colorHex: 0xef4444,
-      intensity: 0.95,
+      color: HIGHLIGHT_PROBLEM,
       infoText: [
-        "Kolizja (czerwone podswietlenie):",
+        collisionHeader(pairMeta),
         "",
         formatMeshInfo("A", leftEntity, {
           expressId: pairMeta.leftExpressId,
@@ -130,7 +121,7 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
 
     showModelInfo?.(
       [
-        "Kolizja (czerwone podswietlenie):",
+        collisionHeader(pairMeta),
         "",
         formatMeshInfo("A", leftEntity, {
           expressId: pairMeta.leftExpressId,
@@ -156,8 +147,7 @@ export const createSelectionManager = ({ showModelInfo, resolveMaterials } = {})
     });
 
     selectMeshes(entities, {
-      colorHex: 0xef4444,
-      intensity: 0.95,
+      color: HIGHLIGHT_PROBLEM,
       infoText: [
         `${kindLabel}: ${group?.label ?? ""}`,
         `Elementy w grupie: ${group?.items?.length ?? entities.length}`,

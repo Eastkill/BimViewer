@@ -1,0 +1,1350 @@
+{
+  "suite": "validation",
+  "startedAt": "2026-11-17T15:24:21.969Z",
+  "finishedAt": "2026-11-17T15:24:22.195Z",
+  "environment": {
+    "backend": "WebGPU",
+    "forcedWebGL": false,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/3.30.14 Chrome/150.0.7871.250 Electron/43.8.9 Safari/537.36",
+    "hardwareConcurrency": 16,
+    "deviceMemoryGiB": 32,
+    "devicePixelRatio": 1,
+    "canvasCssSize": "1280×720",
+    "crossOriginIsolated": false,
+    "webgpuAdapter": {
+      "vendor": "nvidia",
+      "architecture": "turing",
+      "device": "",
+      "description": ""
+    },
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 2070 SUPER (0x00001E84) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "results": {
+    "officeCollisions": {
+      "elements": 70,
+      "disciplineCounts": {
+        "Konstrukcja": 39,
+        "Stolarka": 7,
+        "Elektryka": 8,
+        "WodKan": 11,
+        "HVAC": 4,
+        "MEP": 1,
+        "Inne": 0
+      },
+      "tolerance0": {
+        "tolerance": 0,
+        "allElementPairs": 2415,
+        "oraclePenetrating": 58,
+        "detectedPenetrating": 58,
+        "missedPenetrating": [],
+        "oracleTouching": 36,
+        "detectedTouching": 36,
+        "missedTouching": [],
+        "falsePositives": [],
+        "aabbCandidates": 98,
+        "meshRejected": 4,
+        "perLayerPair": [
+          {
+            "layers": "Konstrukcja × Konstrukcja",
+            "tolerance": 0,
+            "tested": "39 × 39",
+            "aabbCandidates": 65,
+            "meshRejected": 1,
+            "soft": 0,
+            "solid": 64,
+            "total": 64,
+            "elapsedMs": 2
+          },
+          {
+            "layers": "Konstrukcja × Stolarka",
+            "tolerance": 0,
+            "tested": "39 × 7",
+            "aabbCandidates": 11,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 11,
+            "total": 11,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Konstrukcja × Elektryka",
+            "tolerance": 0,
+            "tested": "39 × 8",
+            "aabbCandidates": 3,
+            "meshRejected": 2,
+            "soft": 0,
+            "solid": 1,
+            "total": 1,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Konstrukcja × WodKan",
+            "tolerance": 0,
+            "tested": "39 × 11",
+            "aabbCandidates": 4,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 4,
+            "total": 4,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Konstrukcja × HVAC",
+            "tolerance": 0,
+            "tested": "39 × 4",
+            "aabbCandidates": 9,
+            "meshRejected": 1,
+            "soft": 0,
+            "solid": 8,
+            "total": 8,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Konstrukcja × MEP",
+            "tolerance": 0,
+            "tested": "39 × 1",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Stolarka × Stolarka",
+            "tolerance": 0,
+            "tested": "7 × 7",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Stolarka × Elektryka",
+            "tolerance": 0,
+            "tested": "7 × 8",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Stolarka × WodKan",
+            "tolerance": 0,
+            "tested": "7 × 11",
+            "aabbCandidates": 1,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 1,
+            "total": 1,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Stolarka × HVAC",
+            "tolerance": 0,
+            "tested": "7 × 4",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Stolarka × MEP",
+            "tolerance": 0,
+            "tested": "7 × 1",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Elektryka × Elektryka",
+            "tolerance": 0,
+            "tested": "8 × 8",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Elektryka × WodKan",
+            "tolerance": 0,
+            "tested": "8 × 11",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Elektryka × HVAC",
+            "tolerance": 0,
+            "tested": "8 × 4",
+            "aabbCandidates": 1,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 1,
+            "total": 1,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "Elektryka × MEP",
+            "tolerance": 0,
+            "tested": "8 × 1",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "WodKan × WodKan",
+            "tolerance": 0,
+            "tested": "11 × 11",
+            "aabbCandidates": 2,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 2,
+            "total": 2,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "WodKan × HVAC",
+            "tolerance": 0,
+            "tested": "11 × 4",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "WodKan × MEP",
+            "tolerance": 0,
+            "tested": "11 × 1",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "HVAC × HVAC",
+            "tolerance": 0,
+            "tested": "4 × 4",
+            "aabbCandidates": 1,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 1,
+            "total": 1,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "HVAC × MEP",
+            "tolerance": 0,
+            "tested": "4 × 1",
+            "aabbCandidates": 1,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 1,
+            "total": 1,
+            "elapsedMs": 0
+          },
+          {
+            "layers": "MEP × MEP",
+            "tolerance": 0,
+            "tested": "1 × 1",
+            "aabbCandidates": 0,
+            "meshRejected": 0,
+            "soft": 0,
+            "solid": 0,
+            "total": 0,
+            "elapsedMs": 0
+          }
+        ]
+      },
+      "toleranceMinus1mm": {
+        "tolerance": -0.001,
+        "allElementPairs": 2415,
+        "oraclePenetrating": 58,
+        "detectedPenetrating": 58,
+        "missedPenetrating": [],
+        "oracleTouching": 0,
+        "detectedTouching": 0,
+        "missedTouching": [],
+        "falsePositives": [],
+        "aabbCandidates": 62,
+        "meshRejected": 4
+      },
+      "errorElements": [
+        {
+          "name": "ERROR_Rura_przez_sciane",
+          "oraclePartners": [
+            "Sciana_W_P0"
+          ],
+          "detectedPartners": [
+            "Sciana_W_P0"
+          ]
+        },
+        {
+          "name": "ERROR_Rura_przez_slup",
+          "oraclePartners": [
+            "ERROR_Drzwi_w_slupie",
+            "Korytarz_P0",
+            "Slup_P0_5"
+          ],
+          "detectedPartners": [
+            "ERROR_Drzwi_w_slupie",
+            "Slup_P0_5"
+          ]
+        },
+        {
+          "name": "ERROR_Rura_wewnatrz_slupa",
+          "oraclePartners": [
+            "Korytarz_P0",
+            "Slup_P0_5"
+          ],
+          "detectedPartners": [
+            "Slup_P0_5"
+          ]
+        },
+        {
+          "name": "ERROR_Kanal_przez_belke",
+          "oraclePartners": [
+            "Belka_X_P0",
+            "Belka_Y_P0",
+            "Kanal_nawiew_korytarz",
+            "Korytarz_P0",
+            "Slup_P0_5"
+          ],
+          "detectedPartners": [
+            "Belka_X_P0",
+            "Belka_Y_P0",
+            "Kanal_nawiew_korytarz",
+            "Slup_P0_5"
+          ]
+        },
+        {
+          "name": "ERROR_Oprawa_w_kanale",
+          "oraclePartners": [
+            "Kanal_nawiew_korytarz",
+            "Korytarz_P0"
+          ],
+          "detectedPartners": [
+            "Kanal_nawiew_korytarz"
+          ]
+        },
+        {
+          "name": "ERROR_Drzwi_w_slupie",
+          "oraclePartners": [
+            "ERROR_Rura_przez_slup",
+            "Korytarz_P0",
+            "Sciana_ukosna_P0",
+            "Slup_P0_5"
+          ],
+          "detectedPartners": [
+            "ERROR_Rura_przez_slup",
+            "Sciana_ukosna_P0",
+            "Slup_P0_5"
+          ]
+        },
+        {
+          "name": "ERROR_Pion_przez_plyte",
+          "oraclePartners": [
+            "Plyta_P1"
+          ],
+          "detectedPartners": [
+            "Plyta_P1"
+          ]
+        }
+      ]
+    },
+    "testBuildingCollisions": {
+      "elements": 34,
+      "tolerance0": {
+        "tolerance": 0,
+        "allElementPairs": 561,
+        "oraclePenetrating": 22,
+        "detectedPenetrating": 22,
+        "missedPenetrating": [],
+        "oracleTouching": 24,
+        "detectedTouching": 24,
+        "missedTouching": [],
+        "falsePositives": [],
+        "aabbCandidates": 47,
+        "meshRejected": 1
+      }
+    },
+    "toleranceSweep": {
+      "Konstrukcja × WodKan": [
+        {
+          "tolerance": -0.2,
+          "tested": "39 × 11",
+          "aabbCandidates": 0,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 0,
+          "total": 0,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.1,
+          "tested": "39 × 11",
+          "aabbCandidates": 2,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 2,
+          "total": 2,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.05,
+          "tested": "39 × 11",
+          "aabbCandidates": 4,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 4,
+          "total": 4,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.02,
+          "tested": "39 × 11",
+          "aabbCandidates": 4,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 4,
+          "total": 4,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.01,
+          "tested": "39 × 11",
+          "aabbCandidates": 4,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 4,
+          "total": 4,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0,
+          "tested": "39 × 11",
+          "aabbCandidates": 4,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 4,
+          "total": 4,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.01,
+          "tested": "39 × 11",
+          "aabbCandidates": 5,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 4,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.02,
+          "tested": "39 × 11",
+          "aabbCandidates": 5,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 4,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.05,
+          "tested": "39 × 11",
+          "aabbCandidates": 5,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 4,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.1,
+          "tested": "39 × 11",
+          "aabbCandidates": 5,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 4,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.2,
+          "tested": "39 × 11",
+          "aabbCandidates": 6,
+          "meshRejected": 0,
+          "soft": 2,
+          "solid": 4,
+          "total": 6,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.5,
+          "tested": "39 × 11",
+          "aabbCandidates": 14,
+          "meshRejected": 0,
+          "soft": 10,
+          "solid": 4,
+          "total": 14,
+          "elapsedMs": 0
+        }
+      ],
+      "Konstrukcja × HVAC": [
+        {
+          "tolerance": -0.2,
+          "tested": "39 × 4",
+          "aabbCandidates": 5,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 4,
+          "total": 4,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.1,
+          "tested": "39 × 4",
+          "aabbCandidates": 6,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 5,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.05,
+          "tested": "39 × 4",
+          "aabbCandidates": 6,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 5,
+          "total": 5,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.02,
+          "tested": "39 × 4",
+          "aabbCandidates": 9,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.01,
+          "tested": "39 × 4",
+          "aabbCandidates": 9,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0,
+          "tested": "39 × 4",
+          "aabbCandidates": 9,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.01,
+          "tested": "39 × 4",
+          "aabbCandidates": 9,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.02,
+          "tested": "39 × 4",
+          "aabbCandidates": 9,
+          "meshRejected": 1,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.05,
+          "tested": "39 × 4",
+          "aabbCandidates": 11,
+          "meshRejected": 1,
+          "soft": 2,
+          "solid": 8,
+          "total": 10,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.1,
+          "tested": "39 × 4",
+          "aabbCandidates": 11,
+          "meshRejected": 1,
+          "soft": 2,
+          "solid": 8,
+          "total": 10,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.2,
+          "tested": "39 × 4",
+          "aabbCandidates": 17,
+          "meshRejected": 1,
+          "soft": 8,
+          "solid": 8,
+          "total": 16,
+          "elapsedMs": 1
+        },
+        {
+          "tolerance": 0.5,
+          "tested": "39 × 4",
+          "aabbCandidates": 20,
+          "meshRejected": 1,
+          "soft": 11,
+          "solid": 8,
+          "total": 19,
+          "elapsedMs": 0
+        }
+      ],
+      "Konstrukcja × Stolarka": [
+        {
+          "tolerance": -0.2,
+          "tested": "39 × 7",
+          "aabbCandidates": 0,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 0,
+          "total": 0,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.1,
+          "tested": "39 × 7",
+          "aabbCandidates": 6,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 6,
+          "total": 6,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.05,
+          "tested": "39 × 7",
+          "aabbCandidates": 6,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 6,
+          "total": 6,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.02,
+          "tested": "39 × 7",
+          "aabbCandidates": 8,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.01,
+          "tested": "39 × 7",
+          "aabbCandidates": 8,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 8,
+          "total": 8,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.01,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.02,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.05,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.1,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.2,
+          "tested": "39 × 7",
+          "aabbCandidates": 11,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 11,
+          "total": 11,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.5,
+          "tested": "39 × 7",
+          "aabbCandidates": 16,
+          "meshRejected": 0,
+          "soft": 5,
+          "solid": 11,
+          "total": 16,
+          "elapsedMs": 0
+        }
+      ],
+      "Elektryka × HVAC": [
+        {
+          "tolerance": -0.2,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.1,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.05,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.02,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": -0.01,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.01,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.02,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.05,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.1,
+          "tested": "8 × 4",
+          "aabbCandidates": 1,
+          "meshRejected": 0,
+          "soft": 0,
+          "solid": 1,
+          "total": 1,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.2,
+          "tested": "8 × 4",
+          "aabbCandidates": 2,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 1,
+          "total": 2,
+          "elapsedMs": 0
+        },
+        {
+          "tolerance": 0.5,
+          "tested": "8 × 4",
+          "aabbCandidates": 2,
+          "meshRejected": 0,
+          "soft": 1,
+          "solid": 1,
+          "total": 2,
+          "elapsedMs": 0
+        }
+      ]
+    },
+    "duplicatesOffice": {
+      "elementCount": 70,
+      "globalIdGroups": 1,
+      "geometricGroups": 1,
+      "groups": [
+        {
+          "kind": "globalId",
+          "label": "GlobalId 0DupGidTestSample00001",
+          "elements": [
+            "ERROR_GlobalId_dup_A [office-building-with-errors.ifc]",
+            "ERROR_GlobalId_dup_B [office-building-with-errors.ifc]"
+          ]
+        },
+        {
+          "kind": "geometry",
+          "label": "IfcPipeSegment × 2",
+          "elements": [
+            "ERROR_Duplikat_rury_A [office-building-with-errors.ifc]",
+            "ERROR_Duplikat_rury_B [office-building-with-errors.ifc]"
+          ]
+        }
+      ]
+    },
+    "duplicateToleranceSweep": {
+      "positionTolerance": [
+        {
+          "positionTolerance": 0.01,
+          "geometricGroups": 0,
+          "labels": []
+        },
+        {
+          "positionTolerance": 0.03,
+          "geometricGroups": 0,
+          "labels": []
+        },
+        {
+          "positionTolerance": 0.05,
+          "geometricGroups": 0,
+          "labels": []
+        },
+        {
+          "positionTolerance": 0.06,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        },
+        {
+          "positionTolerance": 0.1,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        },
+        {
+          "positionTolerance": 0.2,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        },
+        {
+          "positionTolerance": 0.5,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        },
+        {
+          "positionTolerance": 1,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        },
+        {
+          "positionTolerance": 3,
+          "geometricGroups": 1,
+          "labels": [
+            "ERROR_Duplikat_rury_A / ERROR_Duplikat_rury_B"
+          ]
+        }
+      ],
+      "sizeTolerance": [
+        {
+          "sizeTolerance": 0.001,
+          "geometricGroups": 1
+        },
+        {
+          "sizeTolerance": 0.01,
+          "geometricGroups": 1
+        },
+        {
+          "sizeTolerance": 0.05,
+          "geometricGroups": 1
+        },
+        {
+          "sizeTolerance": 0.2,
+          "geometricGroups": 1
+        },
+        {
+          "sizeTolerance": 1,
+          "geometricGroups": 1
+        }
+      ]
+    },
+    "duplicatesFederated": {
+      "elementCount": 104,
+      "globalIdGroups": 1,
+      "geometricGroups": 2,
+      "groups": [
+        {
+          "kind": "globalId",
+          "label": "GlobalId 0DupGidTestSample00001",
+          "elements": [
+            "ERROR_GlobalId_dup_A [test-building.ifc]",
+            "ERROR_GlobalId_dup_B [test-building.ifc]",
+            "ERROR_GlobalId_dup_A [office-building-with-errors.ifc]",
+            "ERROR_GlobalId_dup_B [office-building-with-errors.ifc]"
+          ]
+        },
+        {
+          "kind": "geometry",
+          "label": "IfcPipeSegment × 2",
+          "elements": [
+            "Rura_duplikat_A [test-building.ifc]",
+            "Rura_duplikat_B [test-building.ifc]"
+          ]
+        },
+        {
+          "kind": "geometry",
+          "label": "IfcPipeSegment × 2",
+          "elements": [
+            "ERROR_Duplikat_rury_A [office-building-with-errors.ifc]",
+            "ERROR_Duplikat_rury_B [office-building-with-errors.ifc]"
+          ]
+        }
+      ]
+    },
+    "scalingGroundTruth": {
+      "expectedByConstruction": 10,
+      "crossLayer": {
+        "tolerance": 0,
+        "tested": "505 × 510",
+        "aabbCandidates": 10,
+        "meshRejected": 0,
+        "soft": 0,
+        "solid": 10,
+        "total": 10,
+        "elapsedMs": 6
+      },
+      "allPairsInvolveErrorElement": true,
+      "allLayersVsOracle": {
+        "tolerance": 0,
+        "allElementPairs": 514605,
+        "oraclePenetrating": 10,
+        "detectedPenetrating": 10,
+        "missedPenetrating": [],
+        "oracleTouching": 500,
+        "detectedTouching": 200,
+        "missedTouching": [
+          "Plyta_2 × Slup_2_0_0 (0 m)",
+          "Plyta_2 × Slup_2_0_1 (0 m)",
+          "Plyta_2 × Slup_2_0_2 (0 m)",
+          "Plyta_2 × Slup_2_0_3 (0 m)",
+          "Plyta_2 × Slup_2_0_4 (0 m)",
+          "Plyta_2 × Slup_2_0_5 (0 m)",
+          "Plyta_2 × Slup_2_0_6 (0 m)",
+          "Plyta_2 × Slup_2_0_7 (0 m)",
+          "Plyta_2 × Slup_2_0_8 (0 m)",
+          "Plyta_2 × Slup_2_0_9 (0 m)",
+          "Plyta_2 × Slup_2_1_0 (0 m)",
+          "Plyta_2 × Slup_2_1_1 (0 m)",
+          "Plyta_2 × Slup_2_1_2 (0 m)",
+          "Plyta_2 × Slup_2_1_3 (0 m)",
+          "Plyta_2 × Slup_2_1_4 (0 m)",
+          "Plyta_2 × Slup_2_1_5 (0 m)",
+          "Plyta_2 × Slup_2_1_6 (0 m)",
+          "Plyta_2 × Slup_2_1_7 (0 m)",
+          "Plyta_2 × Slup_2_1_8 (0 m)",
+          "Plyta_2 × Slup_2_1_9 (0 m)",
+          "Plyta_2 × Slup_2_2_0 (0 m)",
+          "Plyta_2 × Slup_2_2_1 (0 m)",
+          "Plyta_2 × Slup_2_2_2 (0 m)",
+          "Plyta_2 × Slup_2_2_3 (0 m)",
+          "Plyta_2 × Slup_2_2_4 (0 m)",
+          "Plyta_2 × Slup_2_2_5 (0 m)",
+          "Plyta_2 × Slup_2_2_6 (0 m)",
+          "Plyta_2 × Slup_2_2_7 (0 m)",
+          "Plyta_2 × Slup_2_2_8 (0 m)",
+          "Plyta_2 × Slup_2_2_9 (0 m)",
+          "Plyta_2 × Slup_2_3_0 (0 m)",
+          "Plyta_2 × Slup_2_3_1 (0 m)",
+          "Plyta_2 × Slup_2_3_2 (0 m)",
+          "Plyta_2 × Slup_2_3_3 (0 m)",
+          "Plyta_2 × Slup_2_3_4 (0 m)",
+          "Plyta_2 × Slup_2_3_5 (0 m)",
+          "Plyta_2 × Slup_2_3_6 (0 m)",
+          "Plyta_2 × Slup_2_3_7 (0 m)",
+          "Plyta_2 × Slup_2_3_8 (0 m)",
+          "Plyta_2 × Slup_2_3_9 (0 m)",
+          "Plyta_2 × Slup_2_4_0 (0 m)",
+          "Plyta_2 × Slup_2_4_1 (0 m)",
+          "Plyta_2 × Slup_2_4_2 (0 m)",
+          "Plyta_2 × Slup_2_4_3 (0 m)",
+          "Plyta_2 × Slup_2_4_4 (0 m)",
+          "Plyta_2 × Slup_2_4_5 (0 m)",
+          "Plyta_2 × Slup_2_4_6 (0 m)",
+          "Plyta_2 × Slup_2_4_7 (0 m)",
+          "Plyta_2 × Slup_2_4_8 (0 m)",
+          "Plyta_2 × Slup_2_4_9 (0 m)",
+          "Plyta_2 × Slup_2_5_0 (0 m)",
+          "Plyta_2 × Slup_2_5_1 (0 m)",
+          "Plyta_2 × Slup_2_5_2 (0 m)",
+          "Plyta_2 × Slup_2_5_3 (0 m)",
+          "Plyta_2 × Slup_2_5_4 (0 m)",
+          "Plyta_2 × Slup_2_5_5 (0 m)",
+          "Plyta_2 × Slup_2_5_6 (0 m)",
+          "Plyta_2 × Slup_2_5_7 (0 m)",
+          "Plyta_2 × Slup_2_5_8 (0 m)",
+          "Plyta_2 × Slup_2_5_9 (0 m)",
+          "Plyta_2 × Slup_2_6_0 (0 m)",
+          "Plyta_2 × Slup_2_6_1 (0 m)",
+          "Plyta_2 × Slup_2_6_2 (0 m)",
+          "Plyta_2 × Slup_2_6_3 (0 m)",
+          "Plyta_2 × Slup_2_6_4 (0 m)",
+          "Plyta_2 × Slup_2_6_5 (0 m)",
+          "Plyta_2 × Slup_2_6_6 (0 m)",
+          "Plyta_2 × Slup_2_6_7 (0 m)",
+          "Plyta_2 × Slup_2_6_8 (0 m)",
+          "Plyta_2 × Slup_2_6_9 (0 m)",
+          "Plyta_2 × Slup_2_7_0 (0 m)",
+          "Plyta_2 × Slup_2_7_1 (0 m)",
+          "Plyta_2 × Slup_2_7_2 (0 m)",
+          "Plyta_2 × Slup_2_7_3 (0 m)",
+          "Plyta_2 × Slup_2_7_4 (0 m)",
+          "Plyta_2 × Slup_2_7_5 (0 m)",
+          "Plyta_2 × Slup_2_7_6 (0 m)",
+          "Plyta_2 × Slup_2_7_7 (0 m)",
+          "Plyta_2 × Slup_2_7_8 (0 m)",
+          "Plyta_2 × Slup_2_7_9 (0 m)",
+          "Plyta_2 × Slup_2_8_0 (0 m)",
+          "Plyta_2 × Slup_2_8_1 (0 m)",
+          "Plyta_2 × Slup_2_8_2 (0 m)",
+          "Plyta_2 × Slup_2_8_3 (0 m)",
+          "Plyta_2 × Slup_2_8_4 (0 m)",
+          "Plyta_2 × Slup_2_8_5 (0 m)",
+          "Plyta_2 × Slup_2_8_6 (0 m)",
+          "Plyta_2 × Slup_2_8_7 (0 m)",
+          "Plyta_2 × Slup_2_8_8 (0 m)",
+          "Plyta_2 × Slup_2_8_9 (0 m)",
+          "Plyta_2 × Slup_2_9_0 (0 m)",
+          "Plyta_2 × Slup_2_9_1 (0 m)",
+          "Plyta_2 × Slup_2_9_2 (0 m)",
+          "Plyta_2 × Slup_2_9_3 (0 m)",
+          "Plyta_2 × Slup_2_9_4 (0 m)",
+          "Plyta_2 × Slup_2_9_5 (0 m)",
+          "Plyta_2 × Slup_2_9_6 (0 m)",
+          "Plyta_2 × Slup_2_9_7 (0 m)",
+          "Plyta_2 × Slup_2_9_8 (0 m)",
+          "Plyta_2 × Slup_2_9_9 (0 m)",
+          "Plyta_3 × Slup_3_0_0 (0 m)",
+          "Plyta_3 × Slup_3_0_1 (0 m)",
+          "Plyta_3 × Slup_3_0_2 (0 m)",
+          "Plyta_3 × Slup_3_0_3 (0 m)",
+          "Plyta_3 × Slup_3_0_4 (0 m)",
+          "Plyta_3 × Slup_3_0_5 (0 m)",
+          "Plyta_3 × Slup_3_0_6 (0 m)",
+          "Plyta_3 × Slup_3_0_7 (0 m)",
+          "Plyta_3 × Slup_3_0_8 (0 m)",
+          "Plyta_3 × Slup_3_0_9 (0 m)",
+          "Plyta_3 × Slup_3_1_0 (0 m)",
+          "Plyta_3 × Slup_3_1_1 (0 m)",
+          "Plyta_3 × Slup_3_1_2 (0 m)",
+          "Plyta_3 × Slup_3_1_3 (0 m)",
+          "Plyta_3 × Slup_3_1_4 (0 m)",
+          "Plyta_3 × Slup_3_1_5 (0 m)",
+          "Plyta_3 × Slup_3_1_6 (0 m)",
+          "Plyta_3 × Slup_3_1_7 (0 m)",
+          "Plyta_3 × Slup_3_1_8 (0 m)",
+          "Plyta_3 × Slup_3_1_9 (0 m)",
+          "Plyta_3 × Slup_3_2_0 (0 m)",
+          "Plyta_3 × Slup_3_2_1 (0 m)",
+          "Plyta_3 × Slup_3_2_2 (0 m)",
+          "Plyta_3 × Slup_3_2_3 (0 m)",
+          "Plyta_3 × Slup_3_2_4 (0 m)",
+          "Plyta_3 × Slup_3_2_5 (0 m)",
+          "Plyta_3 × Slup_3_2_6 (0 m)",
+          "Plyta_3 × Slup_3_2_7 (0 m)",
+          "Plyta_3 × Slup_3_2_8 (0 m)",
+          "Plyta_3 × Slup_3_2_9 (0 m)",
+          "Plyta_3 × Slup_3_3_0 (0 m)",
+          "Plyta_3 × Slup_3_3_1 (0 m)",
+          "Plyta_3 × Slup_3_3_2 (0 m)",
+          "Plyta_3 × Slup_3_3_3 (0 m)",
+          "Plyta_3 × Slup_3_3_4 (0 m)",
+          "Plyta_3 × Slup_3_3_5 (0 m)",
+          "Plyta_3 × Slup_3_3_6 (0 m)",
+          "Plyta_3 × Slup_3_3_7 (0 m)",
+          "Plyta_3 × Slup_3_3_8 (0 m)",
+          "Plyta_3 × Slup_3_3_9 (0 m)",
+          "Plyta_3 × Slup_3_4_0 (0 m)",
+          "Plyta_3 × Slup_3_4_1 (0 m)",
+          "Plyta_3 × Slup_3_4_2 (0 m)",
+          "Plyta_3 × Slup_3_4_3 (0 m)",
+          "Plyta_3 × Slup_3_4_4 (0 m)",
+          "Plyta_3 × Slup_3_4_5 (0 m)",
+          "Plyta_3 × Slup_3_4_6 (0 m)",
+          "Plyta_3 × Slup_3_4_7 (0 m)",
+          "Plyta_3 × Slup_3_4_8 (0 m)",
+          "Plyta_3 × Slup_3_4_9 (0 m)",
+          "Plyta_3 × Slup_3_5_0 (0 m)",
+          "Plyta_3 × Slup_3_5_1 (0 m)",
+          "Plyta_3 × Slup_3_5_2 (0 m)",
+          "Plyta_3 × Slup_3_5_3 (0 m)",
+          "Plyta_3 × Slup_3_5_4 (0 m)",
+          "Plyta_3 × Slup_3_5_5 (0 m)",
+          "Plyta_3 × Slup_3_5_6 (0 m)",
+          "Plyta_3 × Slup_3_5_7 (0 m)",
+          "Plyta_3 × Slup_3_5_8 (0 m)",
+          "Plyta_3 × Slup_3_5_9 (0 m)",
+          "Plyta_3 × Slup_3_6_0 (0 m)",
+          "Plyta_3 × Slup_3_6_1 (0 m)",
+          "Plyta_3 × Slup_3_6_2 (0 m)",
+          "Plyta_3 × Slup_3_6_3 (0 m)",
+          "Plyta_3 × Slup_3_6_4 (0 m)",
+          "Plyta_3 × Slup_3_6_5 (0 m)",
+          "Plyta_3 × Slup_3_6_6 (0 m)",
+          "Plyta_3 × Slup_3_6_7 (0 m)",
+          "Plyta_3 × Slup_3_6_8 (0 m)",
+          "Plyta_3 × Slup_3_6_9 (0 m)",
+          "Plyta_3 × Slup_3_7_0 (0 m)",
+          "Plyta_3 × Slup_3_7_1 (0 m)",
+          "Plyta_3 × Slup_3_7_2 (0 m)",
+          "Plyta_3 × Slup_3_7_3 (0 m)",
+          "Plyta_3 × Slup_3_7_4 (0 m)",
+          "Plyta_3 × Slup_3_7_5 (0 m)",
+          "Plyta_3 × Slup_3_7_6 (0 m)",
+          "Plyta_3 × Slup_3_7_7 (0 m)",
+          "Plyta_3 × Slup_3_7_8 (0 m)",
+          "Plyta_3 × Slup_3_7_9 (0 m)",
+          "Plyta_3 × Slup_3_8_0 (0 m)",
+          "Plyta_3 × Slup_3_8_1 (0 m)",
+          "Plyta_3 × Slup_3_8_2 (0 m)",
+          "Plyta_3 × Slup_3_8_3 (0 m)",
+          "Plyta_3 × Slup_3_8_4 (0 m)",
+          "Plyta_3 × Slup_3_8_5 (0 m)",
+          "Plyta_3 × Slup_3_8_6 (0 m)",
+          "Plyta_3 × Slup_3_8_7 (0 m)",
+          "Plyta_3 × Slup_3_8_8 (0 m)",
+          "Plyta_3 × Slup_3_8_9 (0 m)",
+          "Plyta_3 × Slup_3_9_0 (0 m)",
+          "Plyta_3 × Slup_3_9_1 (0 m)",
+          "Plyta_3 × Slup_3_9_2 (0 m)",
+          "Plyta_3 × Slup_3_9_3 (0 m)",
+          "Plyta_3 × Slup_3_9_4 (0 m)",
+          "Plyta_3 × Slup_3_9_5 (0 m)",
+          "Plyta_3 × Slup_3_9_6 (0 m)",
+          "Plyta_3 × Slup_3_9_7 (0 m)",
+          "Plyta_3 × Slup_3_9_8 (0 m)",
+          "Plyta_3 × Slup_3_9_9 (0 m)",
+          "Plyta_4 × Slup_4_0_0 (0 m)",
+          "Plyta_4 × Slup_4_0_1 (0 m)",
+          "Plyta_4 × Slup_4_0_2 (0 m)",
+          "Plyta_4 × Slup_4_0_3 (0 m)",
+          "Plyta_4 × Slup_4_0_4 (0 m)",
+          "Plyta_4 × Slup_4_0_5 (0 m)",
+          "Plyta_4 × Slup_4_0_6 (0 m)",
+          "Plyta_4 × Slup_4_0_7 (0 m)",
+          "Plyta_4 × Slup_4_0_8 (0 m)",
+          "Plyta_4 × Slup_4_0_9 (0 m)",
+          "Plyta_4 × Slup_4_1_0 (0 m)",
+          "Plyta_4 × Slup_4_1_1 (0 m)",
+          "Plyta_4 × Slup_4_1_2 (0 m)",
+          "Plyta_4 × Slup_4_1_3 (0 m)",
+          "Plyta_4 × Slup_4_1_4 (0 m)",
+          "Plyta_4 × Slup_4_1_5 (0 m)",
+          "Plyta_4 × Slup_4_1_6 (0 m)",
+          "Plyta_4 × Slup_4_1_7 (0 m)",
+          "Plyta_4 × Slup_4_1_8 (0 m)",
+          "Plyta_4 × Slup_4_1_9 (0 m)",
+          "Plyta_4 × Slup_4_2_0 (0 m)",
+          "Plyta_4 × Slup_4_2_1 (0 m)",
+          "Plyta_4 × Slup_4_2_2 (0 m)",
+          "Plyta_4 × Slup_4_2_3 (0 m)",
+          "Plyta_4 × Slup_4_2_4 (0 m)",
+          "Plyta_4 × Slup_4_2_5 (0 m)",
+          "Plyta_4 × Slup_4_2_6 (0 m)",
+          "Plyta_4 × Slup_4_2_7 (0 m)",
+          "Plyta_4 × Slup_4_2_8 (0 m)",
+          "Plyta_4 × Slup_4_2_9 (0 m)",
+          "Plyta_4 × Slup_4_3_0 (0 m)",
+          "Plyta_4 × Slup_4_3_1 (0 m)",
+          "Plyta_4 × Slup_4_3_2 (0 m)",
+          "Plyta_4 × Slup_4_3_3 (0 m)",
+          "Plyta_4 × Slup_4_3_4 (0 m)",
+          "Plyta_4 × Slup_4_3_5 (0 m)",
+          "Plyta_4 × Slup_4_3_6 (0 m)",
+          "Plyta_4 × Slup_4_3_7 (0 m)",
+          "Plyta_4 × Slup_4_3_8 (0 m)",
+          "Plyta_4 × Slup_4_3_9 (0 m)",
+          "Plyta_4 × Slup_4_4_0 (0 m)",
+          "Plyta_4 × Slup_4_4_1 (0 m)",
+          "Plyta_4 × Slup_4_4_2 (0 m)",
+          "Plyta_4 × Slup_4_4_3 (0 m)",
+          "Plyta_4 × Slup_4_4_4 (0 m)",
+          "Plyta_4 × Slup_4_4_5 (0 m)",
+          "Plyta_4 × Slup_4_4_6 (0 m)",
+          "Plyta_4 × Slup_4_4_7 (0 m)",
+          "Plyta_4 × Slup_4_4_8 (0 m)",
+          "Plyta_4 × Slup_4_4_9 (0 m)",
+          "Plyta_4 × Slup_4_5_0 (0 m)",
+          "Plyta_4 × Slup_4_5_1 (0 m)",
+          "Plyta_4 × Slup_4_5_2 (0 m)",
+          "Plyta_4 × Slup_4_5_3 (0 m)",
+          "Plyta_4 × Slup_4_5_4 (0 m)",
+          "Plyta_4 × Slup_4_5_5 (0 m)",
+          "Plyta_4 × Slup_4_5_6 (0 m)",
+          "Plyta_4 × Slup_4_5_7 (0 m)",
+          "Plyta_4 × Slup_4_5_8 (0 m)",
+          "Plyta_4 × Slup_4_5_9 (0 m)",
+          "Plyta_4 × Slup_4_6_0 (0 m)",
+          "Plyta_4 × Slup_4_6_1 (0 m)",
+          "Plyta_4 × Slup_4_6_2 (0 m)",
+          "Plyta_4 × Slup_4_6_3 (0 m)",
+          "Plyta_4 × Slup_4_6_4 (0 m)",
+          "Plyta_4 × Slup_4_6_5 (0 m)",
+          "Plyta_4 × Slup_4_6_6 (0 m)",
+          "Plyta_4 × Slup_4_6_7 (0 m)",
+          "Plyta_4 × Slup_4_6_8 (0 m)",
+          "Plyta_4 × Slup_4_6_9 (0 m)",
+          "Plyta_4 × Slup_4_7_0 (0 m)",
+          "Plyta_4 × Slup_4_7_1 (0 m)",
+          "Plyta_4 × Slup_4_7_2 (0 m)",
+          "Plyta_4 × Slup_4_7_3 (0 m)",
+          "Plyta_4 × Slup_4_7_4 (0 m)",
+          "Plyta_4 × Slup_4_7_5 (0 m)",
+          "Plyta_4 × Slup_4_7_6 (0 m)",
+          "Plyta_4 × Slup_4_7_7 (0 m)",
+          "Plyta_4 × Slup_4_7_8 (0 m)",
+          "Plyta_4 × Slup_4_7_9 (0 m)",
+          "Plyta_4 × Slup_4_8_0 (0 m)",
+          "Plyta_4 × Slup_4_8_1 (0 m)",
+          "Plyta_4 × Slup_4_8_2 (0 m)",
+          "Plyta_4 × Slup_4_8_3 (0 m)",
+          "Plyta_4 × Slup_4_8_4 (0 m)",
+          "Plyta_4 × Slup_4_8_5 (0 m)",
+          "Plyta_4 × Slup_4_8_6 (0 m)",
+          "Plyta_4 × Slup_4_8_7 (0 m)",
+          "Plyta_4 × Slup_4_8_8 (0 m)",
+          "Plyta_4 × Slup_4_8_9 (0 m)",
+          "Plyta_4 × Slup_4_9_0 (0 m)",
+          "Plyta_4 × Slup_4_9_1 (0 m)",
+          "Plyta_4 × Slup_4_9_2 (0 m)",
+          "Plyta_4 × Slup_4_9_3 (0 m)",
+          "Plyta_4 × Slup_4_9_4 (0 m)",
+          "Plyta_4 × Slup_4_9_5 (0 m)",
+          "Plyta_4 × Slup_4_9_6 (0 m)",
+          "Plyta_4 × Slup_4_9_7 (0 m)",
+          "Plyta_4 × Slup_4_9_8 (0 m)",
+          "Plyta_4 × Slup_4_9_9 (0 m)"
+        ],
+        "falsePositives": [],
+        "aabbCandidates": 210,
+        "meshRejected": 0
+      }
+    }
+  }
+}

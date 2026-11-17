@@ -44,32 +44,19 @@ const writeStoredMap = (map) => {
   }
 };
 
-export const getStoredFileTransform = (fileName) => {
-  if (!fileName) return null;
-  const map = readStoredMap();
-  const saved = map[fileName];
-  return saved ? normalizeTransform(saved) : null;
-};
-
+/** Saves the transform under the file name; an identity transform removes the entry. */
 export const persistFileTransform = (fileName, transform) => {
   if (!fileName) return;
   const map = readStoredMap();
   const next = normalizeTransform(transform);
 
   if (isIdentityTransform(next)) {
+    if (!(fileName in map)) return;
     delete map[fileName];
   } else {
     map[fileName] = next;
   }
 
-  writeStoredMap(map);
-};
-
-export const clearStoredFileTransform = (fileName) => {
-  if (!fileName) return;
-  const map = readStoredMap();
-  if (!(fileName in map)) return;
-  delete map[fileName];
   writeStoredMap(map);
 };
 
@@ -110,8 +97,8 @@ export const readTransformFromGroup = (fileEntry) => {
 };
 
 export const resetFileTransform = (fileEntry) => {
+  // Persisting an identity transform drops the stored entry.
   applyFileTransform(fileEntry, createEmptyFileTransform(), { persist: true });
-  clearStoredFileTransform(fileEntry?.name);
 };
 
 /**
@@ -119,9 +106,10 @@ export const resetFileTransform = (fileEntry) => {
  * @returns {number} how many files were restored from storage
  */
 export const restoreStoredFileTransforms = (fileEntries = []) => {
+  const map = readStoredMap();
   let restored = 0;
   for (const entry of fileEntries) {
-    const saved = getStoredFileTransform(entry.name);
+    const saved = map[entry.name];
     if (!saved || isIdentityTransform(saved)) continue;
     applyFileTransform(entry, saved, { persist: false });
     restored += 1;

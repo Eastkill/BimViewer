@@ -9,7 +9,7 @@ const MAX_ENTRIES = 12;
 const openDb = () =>
   new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
-      reject(new Error("IndexedDB niedostepne"));
+      reject(new Error("IndexedDB niedostępne"));
       return;
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -28,8 +28,9 @@ const toHex = (buffer) =>
   [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 /**
- * Stable fingerprint: name + size + hash(head/tail).
- * Avoids File.lastModified (unstable for File-from-Blob samples).
+ * Stable fingerprint: name + size + SHA-256 of the first and last 64 KiB.
+ * Hashing only head/tail keeps key generation cheap for very large files;
+ * File.lastModified is deliberately not part of the key.
  */
 export const buildFileCacheKey = async (file, data) => {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);

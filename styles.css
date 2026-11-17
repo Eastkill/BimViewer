@@ -344,6 +344,45 @@ button.collision-item:focus-visible {
   outline: none;
 }
 
+.issue-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: #cbd5e1;
+}
+
+.issue-filter select,
+select.issue-status {
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.issue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.issue-row[data-status="confirmed"] select.issue-status {
+  border-color: #ef4444;
+  color: #fecaca;
+}
+
+.issue-row[data-status="ignored"] button.collision-item,
+.issue-row[data-status="ignored"] select.issue-status {
+  color: #64748b;
+}
+
+.issue-row[data-status="ignored"] button.collision-item {
+  text-decoration: line-through;
+}
+
+.issue-empty {
+  color: #94a3b8;
+}
+
 button.collision-item.active {
   border-color: #ef4444;
   background: #3f1212;

@@ -68,10 +68,10 @@ export const createLayerManager = () => {
 
   const addCustomLayer = ({ name, bindType, bindValue }) => {
     if (!bindType || !bindValue) {
-      throw new Error("Custom warstwa wymaga typu powiazania i wartosci.");
+      throw new Error("Warstwa użytkownika wymaga typu powiązania i wartości.");
     }
     if (!["file", "entity"].includes(bindType)) {
-      throw new Error("Dozwolone powiazania custom: file albo entity.");
+      throw new Error("Dozwolone powiązania warstwy użytkownika: plik albo typ encji.");
     }
 
     const layer = createLayer({
@@ -87,7 +87,7 @@ export const createLayerManager = () => {
     const layer = getLayerById(layerId);
     if (!layer) return false;
     if (layer.kind === "default") {
-      throw new Error("Nie mozna usunac warstwy domyslnej.");
+      throw new Error("Nie można usunąć warstwy domyślnej.");
     }
     layers = layers.filter((item) => item.id !== layerId);
     return true;
@@ -149,8 +149,10 @@ export const createLayerManager = () => {
   };
 
   const applyVisibilityAndOpacity = (modelGroup) => {
+    // Called on every opacity-slider tick: resolve layers once instead of a scan per entity.
+    const layersById = new Map(layers.map((layer) => [layer.id, layer]));
     for (const entity of getEntities(modelGroup)) {
-      const layer = getLayerById(entity.layerId);
+      const layer = layersById.get(entity.layerId);
       if (!layer) {
         entity.layerVisible = true;
         entity.layerOpacity = 1;

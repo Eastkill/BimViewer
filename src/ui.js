@@ -1,13 +1,25 @@
 import { DEFAULT_OUTPUT } from "./constants.js";
+import {
+  countIssueStatuses,
+  DEFAULT_ISSUE_STATUS,
+  filterIssuesByStatus,
+  ISSUE_STATUS_LABELS,
+  ISSUE_STATUS_ORDER
+} from "./issue-status.js";
 import { formatVolume } from "./material-takeoff.js";
 import { formatArea } from "./spatial-areas.js";
+
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+/**
+ * Names coming from IFC files (materials, storeys…) are untrusted input —
+ * escape them before they are placed into innerHTML templates.
+ */
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
 
 export const createUI = () => {
   const fileInput = document.getElementById("ifcFile");
   const loadButton = document.getElementById("loadButton");
-  const loadSampleButton = document.getElementById("loadSampleButton");
-  const loadRealisticSampleButton = document.getElementById("loadRealisticSampleButton");
-  const loadBothSamplesButton = document.getElementById("loadBothSamplesButton");
   const output = document.getElementById("output");
   const canvas = document.getElementById("viewerCanvas");
   const layerControls = document.getElementById("layerControls");
@@ -50,9 +62,6 @@ export const createUI = () => {
 
   const setLoading = (isLoading) => {
     loadButton.disabled = isLoading;
-    loadSampleButton.disabled = isLoading;
-    loadRealisticSampleButton.disabled = isLoading;
-    if (loadBothSamplesButton) loadBothSamplesButton.disabled = isLoading;
     detectCollisionsButton.disabled = isLoading;
     if (detectDuplicatesButton) detectDuplicatesButton.disabled = isLoading;
     collisionIsolationToggle.disabled = isLoading;
@@ -61,7 +70,7 @@ export const createUI = () => {
     if (duplicateSizeTolerance) duplicateSizeTolerance.disabled = isLoading;
     if (refreshReportButton) refreshReportButton.disabled = isLoading;
     if (isLoading) {
-      writeOutput("Wczytywanie IFC i budowanie sceny WebGPU...");
+      writeOutput("Wczytywanie IFC i budowanie sceny…");
     }
   };
 
@@ -108,20 +117,20 @@ export const createUI = () => {
     floorSection.className = "material-report-header";
     const skippedSpaces =
       spatial.meta?.spacesSkippedNoQto > 0
-        ? `<br/>${spatial.meta.spacesSkippedNoQto} pomieszczeń bez Qto — nieuwzględnione (łącznie IfcSpace: ${spatial.meta.spacesTotal ?? "?"} ).`
+        ? `<br/>${Number(spatial.meta.spacesSkippedNoQto)} pomieszczeń bez Qto — nieuwzględnione (łącznie IfcSpace: ${escapeHtml(spatial.meta.spacesTotal ?? "?")}).`
         : "";
-    const unitNote = spatial.meta?.areaUnitNote ? `<br/>${spatial.meta.areaUnitNote}` : "";
+    const unitNote = spatial.meta?.areaUnitNote ? `<br/>${escapeHtml(spatial.meta.areaUnitNote)}` : "";
     const slabNote = spatial.meta?.slabFilterNote
-      ? `<br/>${spatial.meta.slabFilterNote}${
+      ? `<br/>${escapeHtml(spatial.meta.slabFilterNote)}${
           spatial.meta.slabsExcluded
-            ? ` (wykluczono: ${spatial.meta.slabsExcluded})`
+            ? ` (wykluczono: ${Number(spatial.meta.slabsExcluded)})`
             : ""
         }`
       : "";
     floorSection.innerHTML = `
       <h2>Powierzchnia kondygnacji (WF-13)</h2>
       <p class="material-report-meta">
-        Kondygnacje: ${spatial.storeyCount ?? 0} |
+        Kondygnacje: ${Number(spatial.storeyCount ?? 0)} |
         Σ IfcSpace netto: <strong>${formatArea(spatial.totals?.spaceNetArea)} m²</strong> |
         Σ IfcSpace brutto: <strong>${formatArea(spatial.totals?.spaceGrossArea)} m²</strong> |
         Σ IfcSlab (FLOOR): <strong>${formatArea(spatial.totals?.slabArea)} m²</strong>
@@ -150,12 +159,12 @@ export const createUI = () => {
     for (const row of spatial.storeyRows || []) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${row.storeyName}</td>
+        <td>${escapeHtml(row.storeyName)}</td>
         <td class="num">${row.elevation == null ? "—" : Number(row.elevation).toFixed(2)}</td>
         <td class="num">${formatArea(row.spaceNetArea)}</td>
         <td class="num">${formatArea(row.spaceGrossArea)}</td>
         <td class="num">${formatArea(row.slabArea)}</td>
-        <td class="num">${row.spaceCount} / ${row.slabCount}</td>
+        <td class="num">${Number(row.spaceCount)} / ${Number(row.slabCount)}</td>
       `;
       floorBody.append(tr);
     }
@@ -194,8 +203,8 @@ export const createUI = () => {
       if (!(row.wallCount > 0 || row.wallNetArea > 0 || row.wallGrossArea > 0)) continue;
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${row.storeyName}</td>
-        <td class="num">${row.wallCount}</td>
+        <td>${escapeHtml(row.storeyName)}</td>
+        <td class="num">${Number(row.wallCount)}</td>
         <td class="num">${formatArea(row.wallNetArea)}</td>
         <td class="num">${formatArea(row.wallGrossArea)}</td>
       `;
@@ -220,7 +229,7 @@ export const createUI = () => {
     }
 
     if (error) {
-      materialReport.innerHTML = `<p class="material-report-empty">Blad raportu: ${error}</p>`;
+      materialReport.innerHTML = `<p class="material-report-empty">Błąd raportu: ${escapeHtml(error)}</p>`;
       return;
     }
 
@@ -236,10 +245,10 @@ export const createUI = () => {
     header.innerHTML = `
       <h2>Zużycie materiałów — cały projekt</h2>
       <p class="material-report-meta">
-        Elementy: ${report.elementCount ?? 0} |
-        z materiałem IFC: ${report.elementsWithMaterials ?? 0} |
-        objętość z Qto: ${report.elementsFromQto ?? 0} |
-        z geometrii: ${report.elementsFromGeometry ?? 0}<br/>
+        Elementy: ${Number(report.elementCount ?? 0)} |
+        z materiałem IFC: ${Number(report.elementsWithMaterials ?? 0)} |
+        objętość z Qto: ${Number(report.elementsFromQto ?? 0)} |
+        z geometrii: ${Number(report.elementsFromGeometry ?? 0)}<br/>
         Suma objętości: <strong>${formatVolume(report.totalVolumeM3)} m³</strong>
         (estymacja — warstwy × powierzchnia / Qto / geometria)
       </p>
@@ -278,11 +287,11 @@ export const createUI = () => {
         const share = total > 0 ? `${((row.volumeM3 / total) * 100).toFixed(1)}%` : "—";
         const sourceText = [...(row.sources || []), ...(row.notes || [])].filter(Boolean).join(" · ") || "—";
         tr.innerHTML = `
-          <td>${row.material}</td>
+          <td>${escapeHtml(row.material)}</td>
           <td class="num">${formatVolume(row.volumeM3)}</td>
           <td class="num">${share}</td>
-          <td class="num">${row.elementCount}</td>
-          <td>${sourceText}</td>
+          <td class="num">${Number(row.elementCount)}</td>
+          <td>${escapeHtml(sourceText)}</td>
         `;
         tbody.append(tr);
       }
@@ -309,7 +318,145 @@ export const createUI = () => {
     collisionOutput.textContent = text;
   };
 
-  const renderCollisionResults = (result, onPairClick, onPairDoubleClick) => {
+  // Status filter chosen for each list; kept between analyses.
+  const issueFilters = { collisions: "all", duplicates: "all" };
+  const ISSUE_PAGE = 200;
+
+  /**
+   * Filter bar + paged list of issues (collision pairs or duplicate groups), each row
+   * with a status selector. `status` is { get(issue), set(issue, value) }; without it
+   * the list is rendered without statuses.
+   */
+  const renderIssueList = (container, { filterKey, issues, status, labelOf, onClick, onDoubleClick }) => {
+    const getStatus = (issue) => status?.get(issue) ?? DEFAULT_ISSUE_STATUS;
+    const indexOf = new Map(issues.map((issue, index) => [issue, index]));
+
+    const filterBar = document.createElement("label");
+    filterBar.className = "issue-filter";
+    const filterSelect = document.createElement("select");
+    filterBar.append("Pokaż: ", filterSelect);
+
+    const list = document.createElement("ul");
+    list.className = "collision-list";
+
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "collision-item";
+
+    let filtered = [];
+    let visibleCount = 0;
+    let activeIssue = null;
+
+    const refreshFilterOptions = () => {
+      const counts = countIssueStatuses(issues, getStatus);
+      const options = [
+        ["all", `Wszystkie (${issues.length})`],
+        ...ISSUE_STATUS_ORDER.map((value) => [value, `${ISSUE_STATUS_LABELS[value]} (${counts[value]})`])
+      ];
+      filterSelect.replaceChildren(
+        ...options.map(([value, text]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = text;
+          return option;
+        })
+      );
+      filterSelect.value = issueFilters[filterKey];
+    };
+
+    const activate = (button, issue, handler) => {
+      list.querySelectorAll(".collision-item.active").forEach((node) => node.classList.remove("active"));
+      button.classList.add("active");
+      activeIssue = issue;
+      handler?.(issue);
+    };
+
+    const appendItems = (from, to) => {
+      for (let i = from; i < to; i += 1) {
+        const issue = filtered[i];
+        const item = document.createElement("li");
+        item.className = "issue-row";
+        item.dataset.status = getStatus(issue);
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "collision-item";
+        if (issue === activeIssue) button.classList.add("active");
+        button.title = "Kliknij: pokaż w scenie. Podwójne kliknięcie: przenieś kamerę.";
+        button.textContent = labelOf(issue, indexOf.get(issue));
+        button.addEventListener("click", () => activate(button, issue, onClick));
+        button.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          activate(button, issue, onDoubleClick ?? onClick);
+        });
+        item.append(button);
+
+        if (status) {
+          const select = document.createElement("select");
+          select.className = "issue-status";
+          select.title = "Status";
+          for (const value of ISSUE_STATUS_ORDER) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = ISSUE_STATUS_LABELS[value];
+            select.append(option);
+          }
+          select.value = getStatus(issue);
+          select.addEventListener("change", () => {
+            status.set(issue, select.value);
+            item.dataset.status = select.value;
+            refreshFilterOptions();
+            // The row no longer matches the active filter — rebuild the list.
+            if (issueFilters[filterKey] !== "all") renderRows();
+          });
+          item.append(select);
+        }
+
+        list.append(item);
+      }
+    };
+
+    const refreshMore = () => {
+      const remaining = filtered.length - visibleCount;
+      more.hidden = remaining <= 0;
+      more.textContent =
+        remaining > 0
+          ? `Pokaż kolejne ${Math.min(ISSUE_PAGE, remaining)} (widoczne ${visibleCount}/${filtered.length})`
+          : "";
+    };
+
+    const renderRows = () => {
+      filtered = filterIssuesByStatus(issues, issueFilters[filterKey], getStatus);
+      list.replaceChildren();
+      if (!filtered.length) {
+        const empty = document.createElement("li");
+        empty.className = "issue-empty";
+        empty.textContent = "Brak pozycji o wybranym statusie.";
+        list.append(empty);
+      }
+      visibleCount = Math.min(ISSUE_PAGE, filtered.length);
+      appendItems(0, visibleCount);
+      refreshMore();
+    };
+
+    filterSelect.addEventListener("change", () => {
+      issueFilters[filterKey] = filterSelect.value;
+      renderRows();
+    });
+    more.addEventListener("click", () => {
+      const next = Math.min(visibleCount + ISSUE_PAGE, filtered.length);
+      appendItems(visibleCount, next);
+      visibleCount = next;
+      refreshMore();
+    });
+
+    refreshFilterOptions();
+    renderRows();
+    if (status) container.append(filterBar);
+    container.append(list, more);
+  };
+
+  const renderCollisionResults = (result, onPairClick, onPairDoubleClick, status) => {
     collisionOutput.innerHTML = "";
 
     const summary = document.createElement("p");
@@ -348,70 +495,26 @@ export const createUI = () => {
         : null,
       `Kolizje (lista pełna): ${result.collisionsCount}`,
       "Faza 1: AABB → faza 2: trójkąt–trójkąt + containment (odsiewa poręcz w otworze; łapie rurę w słupie).",
-      "Kliknij pare, aby podswietlic obiekty na czerwono.",
-      "Podwojne klikniecie przenosi kamere do kolizji.",
-      "Wlacz \"Tryb izolacji kolizji\", aby przygasic reszte modelu."
+      "Kliknij parę: element A (czerwony) i B (pomarańczowy) są rysowane ponad modelem, żółta ramka wskazuje miejsce kolizji, a reszta modelu jest przyciemniana.",
+      "Podwójne kliknięcie przenosi kamerę do miejsca kolizji. Esc lub kliknięcie elementu w scenie przywraca zwykły widok.",
+      "„Tryb izolacji kolizji” wyróżnia wszystkie kolidujące elementy jednocześnie, z pominięciem par o statusie „Ignoruj”.",
+      "Status pary jest zapamiętywany dla pliku i wraca po ponownym wczytaniu modelu."
     ]
       .filter(Boolean)
       .join("\n");
     collisionOutput.append(summary);
 
-    const list = document.createElement("ul");
-    list.className = "collision-list";
-
-    const activatePair = (button, pair, handler) => {
-      list.querySelectorAll(".collision-item.active").forEach((node) => node.classList.remove("active"));
-      button.classList.add("active");
-      handler?.(pair);
-    };
-
-    const COLLISION_PAGE = 200;
-    let visibleCount = Math.min(COLLISION_PAGE, result.samplePairs.length);
-
-    const appendPairItems = (from, to) => {
-      for (let index = from; index < to; index += 1) {
-        const pair = result.samplePairs[index];
-        const item = document.createElement("li");
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "collision-item";
-        button.title = "Kliknij: podswietl. Podwojne klikniecie: przenies kamere.";
+    renderIssueList(collisionOutput, {
+      filterKey: "collisions",
+      issues: result.samplePairs,
+      status,
+      labelOf: (pair, index) => {
         const kindTag = pair.kind === "soft" ? " [prześwit]" : "";
-        button.textContent = `${index + 1}. ${pair.leftExpressId} (${pair.leftDiscipline}) <-> ${pair.rightExpressId} (${pair.rightDiscipline})${kindTag}`;
-        button.addEventListener("click", () => activatePair(button, pair, onPairClick));
-        button.addEventListener("dblclick", (event) => {
-          event.preventDefault();
-          activatePair(button, pair, onPairDoubleClick ?? onPairClick);
-        });
-        item.append(button);
-        list.append(item);
-      }
-    };
-
-    appendPairItems(0, visibleCount);
-    collisionOutput.append(list);
-
-    if (result.samplePairs.length > COLLISION_PAGE) {
-      const more = document.createElement("button");
-      more.type = "button";
-      more.className = "collision-item";
-      const refreshMoreLabel = () => {
-        const remaining = result.samplePairs.length - visibleCount;
-        more.textContent =
-          remaining > 0
-            ? `Pokaż kolejne ${Math.min(COLLISION_PAGE, remaining)} (widoczne ${visibleCount}/${result.samplePairs.length})`
-            : "";
-        more.hidden = remaining <= 0;
-      };
-      refreshMoreLabel();
-      more.addEventListener("click", () => {
-        const next = Math.min(visibleCount + COLLISION_PAGE, result.samplePairs.length);
-        appendPairItems(visibleCount, next);
-        visibleCount = next;
-        refreshMoreLabel();
-      });
-      collisionOutput.append(more);
-    }
+        return `${index + 1}. ${pair.leftExpressId} (${pair.leftDiscipline}) <-> ${pair.rightExpressId} (${pair.rightDiscipline})${kindTag}`;
+      },
+      onClick: onPairClick,
+      onDoubleClick: onPairDoubleClick
+    });
   };
 
   const setDuplicateOutput = (text) => {
@@ -419,7 +522,7 @@ export const createUI = () => {
     duplicateOutput.textContent = text;
   };
 
-  const renderDuplicateResults = (result, onGroupClick, onGroupDoubleClick) => {
+  const renderDuplicateResults = (result, onGroupClick, onGroupDoubleClick, status) => {
     if (!duplicateOutput) return;
     duplicateOutput.innerHTML = "";
 
@@ -442,42 +545,28 @@ export const createUI = () => {
       `GlobalId × grup: ${result.globalIdDuplicateGroups}`,
       `Geometria × grup: ${result.geometricDuplicateGroups}`,
       `Razem (lista max ${result.groups.length}): ${result.totalGroups}`,
-      "Kliknij grupę, aby podświetlić. Podwójne kliknięcie przenosi kamerę."
+      "Kliknij grupę: jej elementy są rysowane ponad modelem, żółta ramka obejmuje całą grupę, a reszta modelu jest przyciemniana.",
+      "Podwójne kliknięcie przenosi kamerę do grupy. Esc przywraca zwykły widok.",
+      "Status grupy jest zapamiętywany dla pliku."
     ].join("\n");
     duplicateOutput.append(summary);
 
-    const list = document.createElement("ul");
-    list.className = "collision-list";
-
-    const activateGroup = (button, group, handler) => {
-      list.querySelectorAll(".collision-item.active").forEach((node) => node.classList.remove("active"));
-      button.classList.add("active");
-      handler?.(group);
-    };
-
-    result.groups.forEach((group, index) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "collision-item";
-      button.title = "Kliknij: podświetl. Podwójne kliknięcie: przenieś kamerę.";
-      const kind = group.kind === "globalId" ? "GlobalId" : "Geometria";
-      const names = (group.items || [])
-        .map((entry) => entry.entity?.name || entry.entity?.expressID)
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(" / ");
-      button.textContent = `${index + 1}. [${kind}] ${group.label}${names ? ` — ${names}` : ""}`;
-      button.addEventListener("click", () => activateGroup(button, group, onGroupClick));
-      button.addEventListener("dblclick", (event) => {
-        event.preventDefault();
-        activateGroup(button, group, onGroupDoubleClick ?? onGroupClick);
-      });
-      item.append(button);
-      list.append(item);
+    renderIssueList(duplicateOutput, {
+      filterKey: "duplicates",
+      issues: result.groups,
+      status,
+      labelOf: (group, index) => {
+        const kind = group.kind === "globalId" ? "GlobalId" : "Geometria";
+        const names = (group.items || [])
+          .map((entry) => entry.entity?.name || entry.entity?.expressID)
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(" / ");
+        return `${index + 1}. [${kind}] ${group.label}${names ? ` — ${names}` : ""}`;
+      },
+      onClick: onGroupClick,
+      onDoubleClick: onGroupDoubleClick
     });
-
-    duplicateOutput.append(list);
   };
 
   const renderLayerControls = (layers, countsById, bindingOptions, handlers = {}) => {
@@ -495,7 +584,7 @@ export const createUI = () => {
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.className = "secondary";
-    resetBtn.textContent = "Przywroc domyslne";
+    resetBtn.textContent = "Przywróć domyślne";
     resetBtn.addEventListener("click", () => onResetDefaults());
     toolbar.append(resetBtn);
     layerControls.append(toolbar);
@@ -505,14 +594,14 @@ export const createUI = () => {
 
     const nameInput = document.createElement("input");
     nameInput.type = "text";
-    nameInput.placeholder = "Nazwa custom warstwy";
+    nameInput.placeholder = "Nazwa własnej warstwy";
     nameInput.className = "layer-input";
 
     const bindType = document.createElement("select");
     bindType.className = "layer-input";
     bindType.innerHTML = `
-      <option value="file">Powiaz z plikiem</option>
-      <option value="entity">Powiaz z entity</option>
+      <option value="file">Powiąż z plikiem</option>
+      <option value="entity">Powiąż z typem encji</option>
     `;
 
     const bindValue = document.createElement("select");
@@ -524,7 +613,7 @@ export const createUI = () => {
       if (!values.length) {
         const empty = document.createElement("option");
         empty.value = "";
-        empty.textContent = "Brak opcji - wczytaj model";
+        empty.textContent = "Brak opcji — wczytaj model";
         bindValue.append(empty);
         return;
       }
@@ -540,7 +629,7 @@ export const createUI = () => {
 
     const addBtn = document.createElement("button");
     addBtn.type = "button";
-    addBtn.textContent = "Dodaj warstwe";
+    addBtn.textContent = "Dodaj warstwę";
     addBtn.addEventListener("click", () => {
       onAddCustomLayer({
         name: nameInput.value,
@@ -556,7 +645,7 @@ export const createUI = () => {
     const hint = document.createElement("p");
     hint.className = "layer-hint";
     hint.textContent =
-      "Domyslne warstwy = branze. Custom warstwa przejmuje elementy z wybranego pliku albo typu entity.";
+      "Własna warstwa przejmuje elementy z wybranego pliku albo typu encji.";
     layerControls.append(hint);
 
     for (const layer of layers) {
@@ -578,7 +667,7 @@ export const createUI = () => {
 
       const badge = document.createElement("span");
       badge.className = "layer-badge";
-      badge.textContent = layer.kind === "default" ? "domyslna" : "custom";
+      badge.textContent = layer.kind === "default" ? "domyślna" : "własna";
 
       const countNode = document.createElement("span");
       countNode.className = "layer-count";
@@ -590,7 +679,7 @@ export const createUI = () => {
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.className = "secondary layer-remove";
-        removeBtn.textContent = "Usun";
+        removeBtn.textContent = "Usuń";
         removeBtn.addEventListener("click", () => onRemoveLayer(layer.id));
         top.append(removeBtn);
       }
@@ -598,11 +687,11 @@ export const createUI = () => {
       const meta = document.createElement("div");
       meta.className = "layer-meta";
       if (layer.binding?.type === "discipline") {
-        meta.textContent = `Branza: ${layer.binding.value}`;
+        meta.textContent = `Branża: ${layer.binding.value}`;
       } else if (layer.binding?.type === "file") {
         meta.textContent = `Plik: ${layer.binding.value}`;
       } else if (layer.binding?.type === "entity") {
-        meta.textContent = `Entity: ${layer.binding.value}`;
+        meta.textContent = `Typ encji: ${layer.binding.value}`;
       }
 
       const opacityRow = document.createElement("div");
@@ -610,7 +699,7 @@ export const createUI = () => {
 
       const opacityLabel = document.createElement("span");
       opacityLabel.className = "layer-opacity-label";
-      opacityLabel.textContent = "Przezroczystosc";
+      opacityLabel.textContent = "Przezroczystość";
 
       const opacityValue = document.createElement("span");
       opacityValue.className = "layer-opacity-value";
@@ -649,7 +738,7 @@ export const createUI = () => {
     if (!fileEntries?.length) {
       const empty = document.createElement("p");
       empty.className = "file-align-empty";
-      empty.textContent = "Wczytaj jeden lub wiele plikow IFC, aby wyrównać modele.";
+      empty.textContent = "Wczytaj jeden lub wiele plików IFC, aby wyrównać modele.";
       fileAlignControls.append(empty);
       return;
     }
@@ -710,7 +799,7 @@ export const createUI = () => {
     gizmoToggle.checked = gizmoEnabled;
     gizmoToggle.addEventListener("change", () => onToggleGizmo(gizmoToggle.checked));
     const gizmoText = document.createElement("span");
-    gizmoText.textContent = "Gizmo w widoku (przeciagnij osie)";
+    gizmoText.textContent = "Manipulator w widoku (przeciągnij osie)";
     gizmoLabel.append(gizmoToggle, gizmoText);
 
     const modeRow = document.createElement("div");
@@ -718,12 +807,12 @@ export const createUI = () => {
     const translateBtn = document.createElement("button");
     translateBtn.type = "button";
     translateBtn.className = `secondary${transformMode === "translate" ? " active" : ""}`;
-    translateBtn.textContent = "Przesun";
+    translateBtn.textContent = "Przesuń";
     translateBtn.addEventListener("click", () => onModeChange("translate"));
     const rotateBtn = document.createElement("button");
     rotateBtn.type = "button";
     rotateBtn.className = `secondary${transformMode === "rotate" ? " active" : ""}`;
-    rotateBtn.textContent = "Obroc";
+    rotateBtn.textContent = "Obróć";
     rotateBtn.addEventListener("click", () => onModeChange("rotate"));
     modeRow.append(translateBtn, rotateBtn);
 
@@ -783,9 +872,6 @@ export const createUI = () => {
   return {
     fileInput,
     loadButton,
-    loadSampleButton,
-    loadRealisticSampleButton,
-    loadBothSamplesButton,
     canvas,
     writeOutput,
     showModelInfo,

@@ -188,26 +188,28 @@ const matchDisciplineByHints = (text) => {
  */
 export const buildElementSystemHints = (ifcApi, modelId) => {
   const hints = new Map();
-  const relCount = ifcApi.GetLineIDsWithType(modelId, IFCRELASSIGNSTOGROUP);
-  const size = relCount.size();
+  const relIds = ifcApi.GetLineIDsWithType(modelId, IFCRELASSIGNSTOGROUP);
+  const size = relIds.size();
 
   for (let i = 0; i < size; i += 1) {
-    const relId = relCount.get(i);
+    const relId = relIds.get(i);
     let rel;
     try {
-      rel = ifcApi.GetLine(modelId, relId, true);
+      // Non-flattened lines keep references as { value: expressID } handles —
+      // flattening would inline whole entities (slow) and hide the IDs we need.
+      rel = ifcApi.GetLine(modelId, relId, false);
     } catch {
       continue;
     }
 
-    const groupId = rel?.RelatingGroup?.value ?? rel?.RelatingGroup;
-    if (!groupId || typeof groupId !== "number") continue;
+    const groupId = rel?.RelatingGroup?.value ?? rel?.RelatingGroup?.expressID ?? rel?.RelatingGroup;
+    if (typeof groupId !== "number") continue;
 
     let groupType = null;
     let groupLine = null;
     try {
       groupType = ifcApi.GetLineType(modelId, groupId);
-      groupLine = ifcApi.GetLine(modelId, groupId, true);
+      groupLine = ifcApi.GetLine(modelId, groupId, false);
     } catch {
       continue;
     }
@@ -225,7 +227,7 @@ export const buildElementSystemHints = (ifcApi, modelId) => {
     if (!Array.isArray(related)) continue;
 
     for (const item of related) {
-      const expressId = item?.value ?? item;
+      const expressId = item?.value ?? item?.expressID ?? item;
       if (typeof expressId !== "number") continue;
       const previous = hints.get(expressId) ?? "";
       hints.set(expressId, collectHintText(previous, systemHint));
@@ -234,8 +236,6 @@ export const buildElementSystemHints = (ifcApi, modelId) => {
 
   return hints;
 };
-
-export const getDisciplineForType = (ifcTypeId) => TYPE_TO_DISCIPLINE.get(ifcTypeId) ?? DISCIPLINES.OTHER;
 
 /**
  * Resolve discipline using concrete type first, then system/object hints for ambiguous flow types.

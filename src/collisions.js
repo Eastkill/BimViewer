@@ -65,6 +65,8 @@ const extractEntityTriangles = (entity) => {
 
   const tris = new Float32Array(triCount * 9);
   const aabbs = new Float32Array(triCount * 6);
+  // Union of all triangle AABBs (same float32 values the per-triangle tests use).
+  const bounds = new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
 
   const writeVertex = (vertexIndex, offset) => {
     _va.fromBufferAttribute(position, vertexIndex).applyMatrix4(_world);
@@ -105,9 +107,16 @@ const extractEntityTriangles = (entity) => {
     aabbs[ao + 3] = Math.max(ax, bx, cx);
     aabbs[ao + 4] = Math.max(ay, by, cy);
     aabbs[ao + 5] = Math.max(az, bz, cz);
+
+    if (aabbs[ao] < bounds[0]) bounds[0] = aabbs[ao];
+    if (aabbs[ao + 1] < bounds[1]) bounds[1] = aabbs[ao + 1];
+    if (aabbs[ao + 2] < bounds[2]) bounds[2] = aabbs[ao + 2];
+    if (aabbs[ao + 3] > bounds[3]) bounds[3] = aabbs[ao + 3];
+    if (aabbs[ao + 4] > bounds[4]) bounds[4] = aabbs[ao + 4];
+    if (aabbs[ao + 5] > bounds[5]) bounds[5] = aabbs[ao + 5];
   }
 
-  return { tris, aabbs, count: triCount };
+  return { tris, aabbs, bounds, count: triCount };
 };
 
 const triAabbOverlap = (aabbs, index, otherMinX, otherMinY, otherMinZ, otherMaxX, otherMaxY, otherMaxZ) => {
@@ -130,12 +139,40 @@ const loadTriVectors = (tris, index, v0, v1, v2) => {
 };
 
 /**
+ * Indices of the triangles of `data` whose AABB overlaps the bounds of the other mesh.
+ * Only those can take part in a triangle–triangle intersection, so the pair loop below
+ * shrinks from ta·tb to ta'·tb' (e.g. a pipe crossing a large slab touches a few triangles).
+ */
+const trianglesNearBounds = (data, otherBounds) => {
+  const indices = [];
+  for (let i = 0; i < data.count; i += 1) {
+    if (
+      triAabbOverlap(
+        data.aabbs,
+        i,
+        otherBounds[0],
+        otherBounds[1],
+        otherBounds[2],
+        otherBounds[3],
+        otherBounds[4],
+        otherBounds[5]
+      )
+    ) {
+      indices.push(i);
+    }
+  }
+  return indices;
+};
+
+/**
  * Precise mesh–mesh test:
- * 1) per-triangle AABB cull + triangle–triangle
+ * 1) keep only triangles lying in the other mesh's bounds, then per-triangle AABB cull
+ *    + triangle–triangle
  * 2) if surfaces miss: containment (vertex of A inside B / vice versa via odd ray hits)
  *    — catches e.g. a short pipe fully inside a column.
  *
- * Broadphase is still O(n·m) element pairs; narrowphase is O(ta·tb) triangles per pair.
+ * Broadphase is O(n·m) element pairs; narrowphase is O(ta'·tb') triangles per pair,
+ * where ta'/tb' are the triangles inside the overlap region.
  */
 const meshesIntersect = (meshA, meshB, triangleCache) => {
   let dataA = triangleCache.get(meshA);
@@ -150,14 +187,22 @@ const meshesIntersect = (meshA, meshB, triangleCache) => {
   }
   if (!dataA || !dataB) return false;
 
+  const nearA = trianglesNearBounds(dataA, dataB.bounds);
+  const nearB = nearA.length ? trianglesNearBounds(dataB, dataA.bounds) : [];
+
   let outer = dataA;
+  let outerIndices = nearA;
   let inner = dataB;
-  if (dataA.count > dataB.count) {
+  let innerIndices = nearB;
+  if (nearA.length > nearB.length) {
     outer = dataB;
+    outerIndices = nearB;
     inner = dataA;
+    innerIndices = nearA;
   }
 
-  for (let i = 0; i < outer.count; i += 1) {
+  for (let oi = 0; oi < outerIndices.length; oi += 1) {
+    const i = outerIndices[oi];
     const oo = i * 6;
     const ominx = outer.aabbs[oo];
     const ominy = outer.aabbs[oo + 1];
@@ -168,7 +213,8 @@ const meshesIntersect = (meshA, meshB, triangleCache) => {
 
     loadTriVectors(outer.tris, i, _V0, _V1, _V2);
 
-    for (let j = 0; j < inner.count; j += 1) {
+    for (let ii = 0; ii < innerIndices.length; ii += 1) {
+      const j = innerIndices[ii];
       if (!triAabbOverlap(inner.aabbs, j, ominx, ominy, ominz, omaxx, omaxy, omaxz)) continue;
       loadTriVectors(inner.tris, j, _va, _vb, _vc);
       if (triangleTriangleIntersect(_V0, _V1, _V2, _va, _vb, _vc)) return true;

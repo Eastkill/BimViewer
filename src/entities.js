@@ -44,13 +44,6 @@ export const syncEntityAppearance = (entity) => {
   batch.setColorAt(instanceId, _color4);
 };
 
-export const syncAllEntityAppearances = (modelGroup) => {
-  for (const entity of getEntities(modelGroup)) {
-    syncEntityAppearance(entity);
-  }
-  refreshBatchTransparency(modelGroup);
-};
-
 const entityEffectiveOpacity = (entity) =>
   (entity.baseOpacity ?? 1) * (entity.layerOpacity ?? 1) * (entity.isolationOpacity ?? 1);
 
@@ -98,11 +91,9 @@ export const refreshBatchTransparency = (modelGroup) => {
 
     // Mixed opaque+transparent in one BatchedMesh: keep depthWrite so solids still
     // occlude. depthWrite:false on the whole batch was making other layers vanish.
-    const nextTransparent = needsTransparency;
-    const nextDepthWrite = true;
-    if (material.transparent !== nextTransparent || material.depthWrite !== nextDepthWrite) {
-      material.transparent = nextTransparent;
-      material.depthWrite = nextDepthWrite;
+    if (material.transparent !== needsTransparency || material.depthWrite !== true) {
+      material.transparent = needsTransparency;
+      material.depthWrite = true;
       material.needsUpdate = true;
     }
 
@@ -119,6 +110,70 @@ export const getEntityWorldBox = (entity, target = new THREE.Box3()) => {
   return target.copy(_box).applyMatrix4(_worldMatrix);
 };
 
+/**
+ * Box marking where a reported problem is located.
+ * Two entities (a collision pair): the overlap of their boxes; when the boxes do not
+ * overlap on some axis (soft clash), the gap between them on that axis.
+ * Any other count (a duplicate group): the union of the boxes.
+ * Returns null when no entity has a usable box.
+ */
+export const getProblemRegion = (entities = []) => {
+  const boxes = [];
+  for (const entity of entities) {
+    if (!entity?.batch) continue;
+    const box = getEntityWorldBox(entity);
+    if (!box.isEmpty()) boxes.push(box);
+  }
+  if (!boxes.length) return null;
+
+  if (boxes.length === 2) {
+    const [a, b] = boxes;
+    const region = new THREE.Box3();
+    for (const axis of ["x", "y", "z"]) {
+      const low = Math.max(a.min[axis], b.min[axis]);
+      const high = Math.min(a.max[axis], b.max[axis]);
+      region.min[axis] = Math.min(low, high);
+      region.max[axis] = Math.max(low, high);
+    }
+    return region;
+  }
+
+  const region = boxes[0].clone();
+  for (let i = 1; i < boxes.length; i += 1) region.union(boxes[i]);
+  return region;
+};
+
+/**
+ * World-space triangle soup of one entity (9 floats per triangle), used to draw it
+ * as an overlay on top of the model. Returns null for entities without geometry.
+ */
+export const extractEntityWorldPositions = (entity) => {
+  const { batch, instanceId } = entity || {};
+  if (!batch || instanceId == null) return null;
+
+  const range = batch.getGeometryRangeAt?.(batch.getGeometryIdAt(instanceId));
+  const position = batch.geometry.getAttribute("position");
+  if (!range || !position) return null;
+
+  const index = batch.geometry.getIndex();
+  const count = Math.floor(range.count / 3) * 3;
+  if (count <= 0) return null;
+
+  batch.getMatrixAt(instanceId, _matrix);
+  _worldMatrix.copy(batch.matrixWorld).multiply(_matrix);
+
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    const vertexIndex = index ? index.getX(range.start + i) : range.start + i;
+    _vertex.fromBufferAttribute(position, vertexIndex).applyMatrix4(_worldMatrix);
+    positions[i * 3] = _vertex.x;
+    positions[i * 3 + 1] = _vertex.y;
+    positions[i * 3 + 2] = _vertex.z;
+  }
+  return positions;
+};
+
+const _vertex = new THREE.Vector3();
 const _surfA = new THREE.Vector3();
 const _surfB = new THREE.Vector3();
 const _surfC = new THREE.Vector3();
@@ -190,8 +245,6 @@ const sumMeshTriangleAreas = (entity, { skipUpAxis = null, upDotThreshold = 0.9 
   return area;
 };
 
-export const computeEntityMeshSurfaceArea = (entity) => sumMeshTriangleAreas(entity);
-
 /**
  * One-sided wall area: drop faces nearly perpendicular to world Y (top/bottom after
  * Y-up conversion), then /2 for both faces. Do not max with a Z-up variant — that
@@ -203,22 +256,13 @@ export const computeEntityOneSidedSurfaceArea = (entity) => {
 };
 
 export const disposeBatchedModelGroup = (group) => {
-  const batches = group?.userData?.batches?.length
-    ? group.userData.batches
-    : [];
+  if (!group) return;
 
-  if (batches.length) {
-    for (const batch of batches) {
-      batch.material?.dispose?.();
-      batch.dispose?.();
-    }
-  } else {
-    group.traverse((node) => {
-      if (!node.isBatchedMesh) return;
-      node.material?.dispose?.();
-      node.dispose?.();
-    });
-  }
+  group.traverse((node) => {
+    if (!node.isBatchedMesh) return;
+    node.material?.dispose?.();
+    node.dispose?.();
+  });
 
   group.clear();
   group.userData.entities = [];

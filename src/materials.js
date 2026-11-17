@@ -1,7 +1,6 @@
 const IFC_MATERIAL = 1838606355;
 const IFC_MATERIAL_LAYER_SET = 3303938423;
 const IFC_MATERIAL_LAYER_SET_USAGE = 1303795690;
-const IFC_MATERIAL_LIST = 2199411900;
 const IFC_MATERIAL_CONSTITUENT_SET = 2852063980;
 
 const readValue = (value) => {
@@ -42,10 +41,6 @@ export const collectMaterialNames = (node, names = [], seen = new Set()) => {
 
   if (type === IFC_MATERIAL_LAYER_SET || typeName === "IfcMaterialLayerSet") {
     pushUnique(names, readValue(node.LayerSetName));
-  }
-
-  if (type === IFC_MATERIAL_LIST || typeName === "IfcMaterialList") {
-    // names come from nested Materials
   }
 
   if (type === IFC_MATERIAL_LAYER_SET_USAGE || typeName === "IfcMaterialLayerSetUsage") {

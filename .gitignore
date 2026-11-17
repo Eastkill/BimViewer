@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Generated IFC test models (npm run testdata:generate)
+test-models/
+
+# Logs, editor and OS files
+*.log
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local environment
+.env
+.env.*

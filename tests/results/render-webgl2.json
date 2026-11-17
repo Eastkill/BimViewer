@@ -1,0 +1,82 @@
+{
+  "suite": "render",
+  "startedAt": "2026-11-17T13:14:07.536Z",
+  "finishedAt": "2026-11-17T13:14:38.910Z",
+  "environment": {
+    "backend": "WebGL 2",
+    "forcedWebGL": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+    "hardwareConcurrency": 9,
+    "deviceMemoryGiB": 16,
+    "devicePixelRatio": 0.75,
+    "canvasCssSize": "1280×720",
+    "crossOriginIsolated": false,
+    "webgpuAdapter": {
+      "vendor": "",
+      "architecture": "",
+      "device": "",
+      "description": ""
+    },
+    "webglRenderer": "Brave"
+  },
+  "results": {
+    "models": [
+      {
+        "model": "scaling-S.ifc",
+        "elements": 1015,
+        "batches": 1,
+        "stalledFrames": 0,
+        "idleFramesIn1500ms": 0,
+        "fps": 164.8,
+        "renderedFrames": 825,
+        "frameTimeMedianMs": 6.1,
+        "frameTimeP95Ms": 6.3,
+        "renderCpuMsPerFrame": 0.51,
+        "drawCalls": 3,
+        "triangles": 12181
+      },
+      {
+        "model": "scaling-M.ifc",
+        "elements": 5150,
+        "batches": 1,
+        "stalledFrames": 0,
+        "idleFramesIn1500ms": 0,
+        "fps": 164.8,
+        "renderedFrames": 824,
+        "frameTimeMedianMs": 6.1,
+        "frameTimeP95Ms": 6.4,
+        "renderCpuMsPerFrame": 1.128,
+        "drawCalls": 3,
+        "triangles": 61801
+      },
+      {
+        "model": "scaling-L.ifc",
+        "elements": 19420,
+        "batches": 1,
+        "stalledFrames": 0,
+        "idleFramesIn1500ms": 0,
+        "fps": 164.7,
+        "renderedFrames": 824,
+        "frameTimeMedianMs": 6.1,
+        "frameTimeP95Ms": 6.8,
+        "renderCpuMsPerFrame": 3.696,
+        "drawCalls": 3,
+        "triangles": 233041
+      },
+      {
+        "model": "scaling-XL.ifc",
+        "elements": 50120,
+        "batches": 1,
+        "stalledFrames": 0,
+        "idleFramesIn1500ms": 0,
+        "fps": 97.5,
+        "renderedFrames": 488,
+        "frameTimeMedianMs": 10,
+        "frameTimeP95Ms": 12.1,
+        "renderCpuMsPerFrame": 10.036,
+        "drawCalls": 3,
+        "triangles": 601441
+      }
+    ]
+  }
+}
