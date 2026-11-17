@@ -48,9 +48,20 @@ Katalog `dist/` jest w pełni statyczny i używa ścieżek względnych (`base: "
 więc można go umieścić na dowolnym serwerze plików statycznych, także w podkatalogu.
 Serwer musi zwracać pliki `.wasm` z typem `application/wasm`.
 
+### GitHub Pages
+
+Workflow `.github/workflows/pages.yml` buduje aplikację przy każdym pushu na `main`
+i publikuje katalog `dist/`. W repozytorium ustaw:
+
+**Settings → Pages → Source: GitHub Actions**.
+
+Po pierwszym udanym przebiegu adres będzie:
+`https://eastkill.github.io/BimViewer/`.
+
 Wielowątkowa wersja `web-ifc` jest używana tylko wtedy, gdy strona jest
 izolowana międzydomenowo (nagłówki `Cross-Origin-Opener-Policy: same-origin`
 i `Cross-Origin-Embedder-Policy: require-corp`); w przeciwnym razie działa wersja jednowątkowa.
+Na GitHub Pages nagłówków tych nie ma, więc działa wariant jednowątkowy.
 
 ## Struktura
 
